@@ -1,7 +1,7 @@
 {
   "name": "track",
   "version": "0.0.1",
-  "homepage": "https://github.com/sourcegraph/go-track",
+  "homepage": "https://github.com/sourcegraph/track",
   "authors": [
     "Quinn Slack <sqs@sourcegraph.com>"
   ],

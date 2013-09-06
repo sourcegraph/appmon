@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"flag"
 	"github.com/gorilla/mux"
-	"github.com/sourcegraph/go-track/track"
+	"github.com/sourcegraph/track"
 	"html/template"
 	"log"
 	"net/http"
@@ -13,7 +13,7 @@ import (
 )
 
 var bind = flag.String("http", ":8888", "HTTP bind address")
-var dir = flag.String("dir", "example", "path to github.com/sourcegraph/go-track/example dir")
+var dir = flag.String("dir", "example", "path to github.com/sourcegraph/track/example dir")
 var dropDB = flag.Bool("dropdb", false, "drop the database before initializing it")
 var initDB = flag.Bool("initdb", false, "initialize the database before running")
 
