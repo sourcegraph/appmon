@@ -1,7 +1,6 @@
 package track
 
 import (
-	"database/sql"
 	"time"
 )
 
@@ -9,7 +8,7 @@ import (
 type Client struct {
 	// User is the ID of the user who viewed the application state, or null if
 	// the client is not logged in.
-	User sql.NullString
+	User NullString
 
 	// ClientID is the unique ID associated with the client.
 	ClientID int64

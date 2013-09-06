@@ -185,3 +185,56 @@ func (x *NullInt) Scan(v interface{}) error {
 	}
 	return nil
 }
+
+// NullString is sql.NullString with an implementation of the
+// encoding/json.Marshaler and encoding/json.Unmarshaler interfaces.
+type NullString sql.NullString
+
+// Scan implements the database/sql/driver.Scanner interface.
+func (ns *NullString) Scan(v interface{}) error {
+	if v == nil {
+		ns.String, ns.Valid = "", false
+		return nil
+	}
+	b, ok := v.([]byte)
+	if !ok {
+		return fmt.Errorf("%T.Scan failed: %v", ns, v)
+	}
+	ns.String = string(b)
+	ns.Valid = true
+	return nil
+}
+
+// Value implements the database/sql/driver.Valuer interface.
+func (ns NullString) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return ns.String, nil
+}
+
+// MarshalJSON implements the encoding/json.Marshaler interface.
+func (s NullString) MarshalJSON() ([]byte, error) {
+	if s.Valid {
+		return json.Marshal(s.String)
+	} else {
+		return json.Marshal(nil)
+	}
+}
+
+// UnmarshalJSON implements the encoding/json.Unmarshaler interface.
+func (s *NullString) UnmarshalJSON(data []byte) error {
+	var v interface{}
+	err := json.Unmarshal(data, &v)
+	if err != nil {
+		return err
+	}
+	if v, ok := v.(string); ok {
+		s.String = v
+		s.Valid = true
+	} else {
+		s.String = ""
+		s.Valid = false
+	}
+	return nil
+}
