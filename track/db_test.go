@@ -2,12 +2,17 @@ package track
 
 import (
 	"database/sql"
+	"flag"
 	"reflect"
 	"sync"
 	"testing"
 	"time"
 )
 
+var dropDB = flag.Bool("test.dropdb", false, "drop the database before initializing it and running tests")
+var initDB = flag.Bool("test.initdb", false, "initialize the test database before running tests")
+
+var dropDBOnce sync.Once
 var initDBOnce sync.Once
 
 func dbSetUp() {
@@ -17,12 +22,22 @@ func dbSetUp() {
 		panic("OpenDB: " + err.Error())
 	}
 
-	initDBOnce.Do(func() {
-		err = InitDB()
-		if err != nil {
-			panic("InitDB: " + err.Error())
-		}
-	})
+	if *dropDB {
+		dropDBOnce.Do(func() {
+			err = DropDBSchema()
+			if err != nil {
+				panic("DropDB: " + err.Error())
+			}
+		})
+	}
+	if *initDB {
+		initDBOnce.Do(func() {
+			err = InitDB()
+			if err != nil {
+				panic("InitDB: " + err.Error())
+			}
+		})
+	}
 
 	DB, err = dbConn.Begin()
 	if err != nil {

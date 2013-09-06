@@ -40,20 +40,8 @@ func OpenDB() (err error) {
 // InitDB creates the database schema and tables.
 func InitDB() (err error) {
 	_, err = DB.Exec(`
-DO $$
-BEGIN
-  -- Mimics CREATE SCHEMA IF NOT EXISTS behavior.
-  IF NOT EXISTS(
-      SELECT schema_name
-        FROM information_schema.schemata
-        WHERE schema_name = '` + DBSchema + `'
-    )
-  THEN
-    EXECUTE 'CREATE SCHEMA "` + DBSchema + `"';
-  END IF;
-END
-$$;
-CREATE TABLE IF NOT EXISTS "` + DBSchema + `".view (
+CREATE SCHEMA "` + DBSchema + `";
+CREATE TABLE "` + DBSchema + `".view (
   id serial NOT NULL,
   "user" varchar(32) NULL,
   client_id bigint NOT NULL,
@@ -62,7 +50,7 @@ CREATE TABLE IF NOT EXISTS "` + DBSchema + `".view (
   date timestamp(3) NOT NULL,
   CONSTRAINT view_pkey PRIMARY KEY (id)
 );
-CREATE TABLE IF NOT EXISTS "` + DBSchema + `".call (
+CREATE TABLE "` + DBSchema + `".call (
   id serial NOT NULL,
   view_id bigint NULL,
   request_uri varchar(128) NOT NULL,
@@ -73,6 +61,12 @@ CREATE TABLE IF NOT EXISTS "` + DBSchema + `".call (
   CONSTRAINT call_pkey PRIMARY KEY (id)
 );
 `)
+	return
+}
+
+// DropDBSchema drops the database schema and tables.
+func DropDBSchema() (err error) {
+	_, err = DB.Exec(`DROP SCHEMA IF EXISTS "` + DBSchema + `" CASCADE;`)
 	return
 }
 
