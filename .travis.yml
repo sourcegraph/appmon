@@ -1,0 +1,10 @@
+language: go
+
+go:
+  - 1.1
+
+before_script:
+  - psql -c 'create database track_test;' -U postgres
+
+env:
+  - PGDATABASE=track_test PGUSER=postgres
