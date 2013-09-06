@@ -62,19 +62,21 @@ func TestInsertView(t *testing.T) {
 	dbSetUp()
 	defer dbTearDown()
 
+	w, err := NextWin()
+	if err != nil {
+		t.Fatal("NextWin", err)
+	}
 	v := &View{
+		ViewID: ViewID{Win: w, Seq: 123},
 		Client: Client{User: sql.NullString{"alice", true}},
 		State:  "my.state",
 		Params: map[string]interface{}{"k": "v"},
 		Date:   dbNow(),
 	}
 
-	err := InsertView(v)
+	err = InsertView(v)
 	if err != nil {
 		t.Fatal("InsertView", err)
-	}
-	if v.ID == 0 {
-		t.Error("v.ID == 0")
 	}
 
 	var vs []*View

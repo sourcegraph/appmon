@@ -41,18 +41,21 @@ func OpenDB() (err error) {
 func InitDB() (err error) {
 	_, err = DB.Exec(`
 CREATE SCHEMA "` + DBSchema + `";
+CREATE SEQUENCE "` + DBSchema + `".win_sequence;
 CREATE TABLE "` + DBSchema + `".view (
-  id serial NOT NULL,
+  win int NOT NULL,
+  seq int NOT NULL,
   "user" varchar(32) NULL,
   client_id bigint NOT NULL,
   state varchar(32) NOT NULL,
   params json NOT NULL,
   date timestamp(3) NOT NULL,
-  CONSTRAINT view_pkey PRIMARY KEY (id)
+  CONSTRAINT view_pkey PRIMARY KEY (win, seq)
 );
 CREATE TABLE "` + DBSchema + `".call (
   id serial NOT NULL,
-  view_id bigint NULL,
+  view_win int NULL,
+  view_seq int NULL,
   request_uri varchar(128) NOT NULL,
   route varchar(32) NOT NULL,
   route_params json NOT NULL,
@@ -70,12 +73,20 @@ func DropDBSchema() (err error) {
 	return
 }
 
+// NextWin returns the next win ID from the PostgreSQL sequence.
+func NextWin() (win int, err error) {
+	row := DB.QueryRow(`SELECT nextval('"` + DBSchema + `".win_sequence')`)
+	err = row.Scan(&win)
+	return
+}
+
 // InsertView adds a view to the database.
 func InsertView(v *View) (err error) {
-	return DB.QueryRow(`
-INSERT INTO "`+DBSchema+`".view("user", client_id, state, params, date)
-VALUES($1, $2, $3, $4, $5) RETURNING id
-`, v.User, v.ClientID, v.State, v.Params, v.Date).Scan(&v.ID)
+	_, err = DB.Exec(`
+INSERT INTO "`+DBSchema+`".view(win, seq, "user", client_id, state, params, date)
+VALUES($1, $2, $3, $4, $5, $6, $7)
+`, v.Win, v.Seq, v.User, v.ClientID, v.State, v.Params, v.Date)
+	return
 }
 
 // QueryViews returns all views matching the SQL query conditions.
@@ -87,7 +98,7 @@ func QueryViews(query string, args ...interface{}) (views []*View, err error) {
 	}
 	for rows.Next() {
 		v := new(View)
-		err = rows.Scan(&v.ID, &v.User, &v.ClientID, &v.State, &v.Params, &v.Date)
+		err = rows.Scan(&v.Win, &v.Seq, &v.User, &v.ClientID, &v.State, &v.Params, &v.Date)
 		if err != nil {
 			return
 		}
@@ -98,10 +109,14 @@ func QueryViews(query string, args ...interface{}) (views []*View, err error) {
 
 // InsertCall adds a Call to the database.
 func InsertCall(c *Call) (err error) {
+	var win, seq *int
+	if c.View != nil {
+		win, seq = &c.View.Win, &c.View.Seq
+	}
 	return DB.QueryRow(`
-INSERT INTO "`+DBSchema+`".call(view_id, request_uri, route, route_params, query_params, date)
-VALUES($1, $2, $3, $4, $5, $6) RETURNING id
-`, c.ViewID, c.RequestURI, c.Route, c.RouteParams, c.QueryParams, c.Date).Scan(&c.ID)
+INSERT INTO "`+DBSchema+`".call(view_win, view_seq, request_uri, route, route_params, query_params, date)
+VALUES($1, $2, $3, $4, $5, $6, $7) RETURNING id
+`, win, seq, c.RequestURI, c.Route, c.RouteParams, c.QueryParams, c.Date).Scan(&c.ID)
 }
 
 // QueryCalls returns all calls matching the SQL query conditions.
@@ -113,9 +128,13 @@ func QueryCalls(query string, args ...interface{}) (calls []*Call, err error) {
 	}
 	for rows.Next() {
 		c := new(Call)
-		err = rows.Scan(&c.ID, &c.ViewID, &c.RequestURI, &c.Route, &c.RouteParams, &c.QueryParams, &c.Date)
+		var win, seq NullInt
+		err = rows.Scan(&c.ID, &win, &seq, &c.RequestURI, &c.Route, &c.RouteParams, &c.QueryParams, &c.Date)
 		if err != nil {
 			return
+		}
+		if win.Valid && seq.Valid {
+			c.View = &ViewID{Win: win.Int, Seq: seq.Int}
 		}
 		calls = append(calls, c)
 	}
@@ -136,4 +155,33 @@ func (x *Params) Scan(v interface{}) error {
 		return json.Unmarshal(data, x)
 	}
 	return fmt.Errorf("%T.Scan failed: %v", x, v)
+}
+
+// NullInt represents an int that may be null.
+type NullInt struct {
+	Int   int
+	Valid bool // Valid is true if Int is not NULL
+}
+
+// Value implements the driver database/sql/driver.Valuer interface.
+func (x NullInt) Value() (driver.Value, error) {
+	if !x.Valid {
+		return nil, nil
+	}
+	return x.Int, nil
+}
+
+// Scan implements the database/sql/driver.Scanner interface.
+func (x *NullInt) Scan(v interface{}) error {
+	if v == nil {
+		x.Int, x.Valid = 0, false
+		return nil
+	}
+	i, ok := v.(int64)
+	x.Int = int(i)
+	x.Valid = true
+	if !ok {
+		return fmt.Errorf("%T.Scan failed: %v", x, v)
+	}
+	return nil
 }

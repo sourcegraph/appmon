@@ -1,17 +1,18 @@
 package track
 
 import (
-	"database/sql"
+	"fmt"
 	"github.com/gorilla/mux"
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 )
 
-// ViewIDHeader is the HTTP header ("X-View-ID") that contains the view ID
+// ViewIDHeader is the HTTP header ("X-Track-View") that contains the view win and sequence
 // passed from the client.
-const ViewIDHeader = "X-View-ID"
+const ViewIDHeader = "X-Track-View"
 
 // TrackCall wraps an http.Handler, tracking a Call in the database describing
 // the HTTP request and response.
@@ -22,9 +23,9 @@ func TrackCall(h http.Handler) http.Handler {
 func storeCall(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Assumes that the storeViewID handler has already run.
-		viewID := ViewID(r)
+		viewID := GetViewID(r)
 		c := &Call{
-			ViewID:      sql.NullInt64{viewID, viewID != 0},
+			View:        viewID,
 			RequestURI:  r.RequestURI,
 			Route:       mux.CurrentRoute(r).GetName(),
 			RouteParams: mapStringStringAsParams(mux.Vars(r)),
@@ -44,16 +45,10 @@ func storeCall(h http.Handler) http.Handler {
 
 func storeViewID(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		viewIDStr := r.Header.Get(ViewIDHeader)
-		if viewIDStr != "" {
-			viewID, err := strconv.ParseInt(viewIDStr, 10, 64)
-			if err != nil || viewID == 0 {
-				if err != nil {
-					log.Printf("ParseInt on %s header failed: %s (header value is %q)", ViewIDHeader, err, viewIDStr)
-				}
-				if viewID == 0 {
-					log.Printf("%s header value is 0", ViewIDHeader)
-				}
+		if viewIDStr := r.Header.Get(ViewIDHeader); viewIDStr != "" {
+			viewID, err := parseViewIDHeader(viewIDStr)
+			if err != nil {
+				log.Printf("ParseInt on %s header failed: %s (header value is %q)", ViewIDHeader, err, viewIDStr)
 				w.WriteHeader(http.StatusBadRequest)
 				return
 			}
@@ -62,6 +57,20 @@ func storeViewID(h http.Handler) http.Handler {
 
 		h.ServeHTTP(w, r)
 	})
+}
+
+func parseViewIDHeader(value string) (id ViewID, err error) {
+	values := strings.Split(strings.TrimSpace(value), " ")
+	if len(values) != 2 {
+		err = fmt.Errorf("ViewID header has %d values; must have exactly 2", len(values))
+		return
+	}
+	id.Win, err = strconv.Atoi(values[0])
+	if err != nil {
+		return
+	}
+	id.Seq, err = strconv.Atoi(values[1])
+	return
 }
 
 func mapStringStringAsParams(m map[string]string) (p Params) {

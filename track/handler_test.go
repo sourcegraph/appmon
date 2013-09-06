@@ -1,13 +1,12 @@
 package track
 
 import (
-	"database/sql"
+	"fmt"
 	"github.com/gorilla/mux"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"reflect"
-	"strconv"
 	"testing"
 	"time"
 )
@@ -46,8 +45,8 @@ func TestTrackCall_NoViewID(t *testing.T) {
 	var called bool
 	h := TrackCall(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
-		if viewID := ViewID(r); viewID != 0 {
-			t.Errorf("want viewID == 0, got %d", viewID)
+		if viewID := GetViewID(r); viewID != nil {
+			t.Errorf("want viewID == nil, got %+v", viewID)
 		}
 	}))
 
@@ -90,12 +89,12 @@ func TestTrackCall_ViewID(t *testing.T) {
 	defer dbTearDown()
 	defer httpTearDown()
 
-	wantViewID := int64(123)
+	wantViewID := &ViewID{123, 456}
 	var called bool
 	h := TrackCall(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
-		if got := ViewID(r); got != wantViewID {
-			t.Errorf("want viewID == %d, got %d", wantViewID, got)
+		if viewID := GetViewID(r); !reflect.DeepEqual(wantViewID, viewID) {
+			t.Errorf("want viewID == %+v, got %+v", wantViewID, viewID)
 		}
 	}))
 
@@ -103,11 +102,9 @@ func TestTrackCall_ViewID(t *testing.T) {
 	rt.Path(`/`).Methods("GET").Handler(h)
 	rootMux.Handle("/", rt)
 
-	wantCall := &Call{
-		ViewID: sql.NullInt64{wantViewID, true},
-	}
+	wantCall := &Call{View: wantViewID}
 
-	httpGet(t, serverURL.String(), ViewIDHeader, strconv.Itoa(int(wantViewID)))
+	httpGet(t, serverURL.String(), ViewIDHeader, makeViewIDHeader(*wantViewID))
 
 	// Check that call was tracked.
 	if !called {
@@ -115,9 +112,13 @@ func TestTrackCall_ViewID(t *testing.T) {
 	}
 	call := getOnlyOneCall(t)
 	// ID and Date vary, so don't bother checking them.
-	if wantCall.ViewID != call.ViewID {
-		t.Errorf("want call.ViewID == %+v, got %+v", wantCall.ViewID, call.ViewID)
+	if !reflect.DeepEqual(wantCall.View, call.View) {
+		t.Errorf("want call.View == %+v, got %+v", wantCall.View, call.View)
 	}
+}
+
+func makeViewIDHeader(id ViewID) string {
+	return fmt.Sprintf("%d %d", id.Win, id.Seq)
 }
 
 func httpGet(t *testing.T, url string, headerKey, headerVal string) {
@@ -147,4 +148,23 @@ func getOnlyOneCall(t *testing.T) *Call {
 		t.Fatalf("want len(calls) == 1, got %d", len(calls))
 	}
 	return calls[0]
+}
+
+func TestParseViewIDHeader(t *testing.T) {
+	tests := []struct {
+		input string
+		want  ViewID
+		err   bool
+	}{}
+	for _, test := range tests {
+		got, err := parseViewIDHeader(test.input)
+		if test.err && err == nil {
+			t.Fatal("%q: want err != nil, got nil", test.input)
+		} else if !test.err && err != nil {
+			t.Fatal("%q: want err == nil, got %q", test.input, err)
+		}
+		if test.want != got {
+			t.Errorf("%q: want viewID == %+v, got %+v", test.input, test.want, got)
+		}
+	}
 }

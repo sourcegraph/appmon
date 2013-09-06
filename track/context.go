@@ -11,16 +11,16 @@ const (
 	viewID contextKey = iota
 )
 
-// ViewID returns the view ID stored in the HTTP request context, or 0 if none
+// GetViewID returns the view ID stored in the HTTP request context, or 0 if none
 // exists.
-func ViewID(r *http.Request) (id int64) {
+func GetViewID(r *http.Request) (id *ViewID) {
 	v := context.Get(r, viewID)
 	if v != nil {
-		id, _ = v.(int64)
+		id, _ = v.(*ViewID)
 	}
 	return
 }
 
-func setViewID(r *http.Request, id int64) {
-	context.Set(r, viewID, id)
+func setViewID(r *http.Request, id ViewID) {
+	context.Set(r, viewID, &id)
 }

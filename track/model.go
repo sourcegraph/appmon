@@ -17,8 +17,7 @@ type Client struct {
 
 // View represents an instance of a client viewing an application state.
 type View struct {
-	// ID is the unique ID of this view.
-	ID int64
+	ViewID
 
 	Client
 
@@ -32,13 +31,23 @@ type View struct {
 	Date time.Time
 }
 
+// ViewID is the primary key for a view.
+type ViewID struct {
+	// Win is a unique ID assigned to the client at the initialization time
+	// of the application.
+	Win int
+
+	// Seq is the sequence number of this view in the win, incremented by the client.
+	Seq int
+}
+
 // Call represents an API call made by a client.
 type Call struct {
 	// ID is the unique ID of this call.
 	ID int64
 
-	// ViewID refers to the current view of the client that initiated this request.
-	ViewID sql.NullInt64
+	// View is the ID of the current view of the client that initiated this request.
+	View *ViewID
 
 	// RequestURI is the portion of the requested URL after the host and port.
 	RequestURI string
