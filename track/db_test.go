@@ -10,7 +10,7 @@ import (
 
 var initDBOnce sync.Once
 
-func setUp() {
+func dbSetUp() {
 	DBSchema = "test_track"
 	err := OpenDB()
 	if err != nil {
@@ -30,7 +30,7 @@ func setUp() {
 	}
 }
 
-func tearDown() {
+func dbTearDown() {
 	tx, ok := DB.(*sql.Tx)
 	if !ok {
 		return
@@ -44,8 +44,8 @@ func tearDown() {
 }
 
 func TestInsertView(t *testing.T) {
-	setUp()
-	defer tearDown()
+	dbSetUp()
+	defer dbTearDown()
 
 	v := &View{
 		Client: Client{User: sql.NullString{"alice", true}},
@@ -73,8 +73,8 @@ func TestInsertView(t *testing.T) {
 }
 
 func TestInsertCall(t *testing.T) {
-	setUp()
-	defer tearDown()
+	dbSetUp()
+	defer dbTearDown()
 
 	c := &Call{
 		RequestURI:  "/abc",
