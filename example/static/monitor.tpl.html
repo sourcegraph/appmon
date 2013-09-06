@@ -1,0 +1,16 @@
+<div class="col-md-6" ng-controller="ViewsCtrl">
+  <h3>Views (win={{views[0].Win}})</h3>
+  <ol>
+    <li ng-repeat="v in views">
+      {{v}}
+    </li>
+  </ol>
+</div>
+<div class="col-md-6" ng-controller="CallsCtrl">
+  <h3>Calls (win={{calls[0].View.Win}}, seq={{calls[0].View.Seq}})</h3>
+  <ol>
+    <li ng-repeat="c in calls">
+      {{c}}
+    </li>
+  </ol>
+</div>

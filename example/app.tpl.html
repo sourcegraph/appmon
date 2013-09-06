@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html ng-app="example">
+  <head>
+    <title>track</title>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+
+    <link rel="stylesheet" type="text/css" href="/static/bower_components/bootstrap/dist/css/bootstrap.css">
+
+    <script type="text/javascript" src="/static/bower_components/angular/angular.js"></script>
+    <script type="text/javascript" src="/static/bower_components/angular-resource/angular-resource.js"></script>
+    <script type="text/javascript" src="/static/bower_components/angular-ui-router/release/angular-ui-router.js"></script>
+    <script type="text/javascript">
+      window.__trackClientData = {{ .Data }};
+      window.__trackClientConfig = {{ .Config }};
+    </script>
+    <script type="text/javascript" src="/static/angular-track/angular-track.js"></script>
+  </head>
+  <body>
+
+    <div class="container">
+      <div class="header">
+        <ul class="nav nav-pills pull-right">
+          <li class="active"><a href="/">Home</a></li>
+        </ul>
+        <h3 class="text-muted">track</h3>
+      </div>
+
+      <div ui-view></div>
+
+      <div class="row" ng-controller="ConfigCtrl">
+        <div class="col-md-6">
+          <h3>TrackCurrentView</h3>
+          <pre>{{"{{TrackCurrentView|json}}"}}</pre>
+        </div>
+        <div class="col-md-6">
+          <h3>TrackClientConfig</h3>
+          <pre>{{"{{TrackClientConfig|json}}"}}</pre>
+        </div>
+      </div>
+
+      <div class="row" ng-include="'/static/monitor.tpl.html'"></div>
+
+    </div> <!-- /container -->
+
+    <script type="text/javascript" src="/static/app.js"></script>
+  </body>
+</html>
