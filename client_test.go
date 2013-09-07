@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestClientEntryPoint_PresentInCookie(t *testing.T) {
+func TestInstantiateApp_PresentInCookie(t *testing.T) {
 	dbSetUp()
 	httpSetUp()
 	defer dbTearDown()
@@ -16,9 +16,13 @@ func TestClientEntryPoint_PresentInCookie(t *testing.T) {
 
 	wantClientID := int64(123)
 	var called bool
-	h := ClientEntryPoint(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	h := InstantiateApp(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
-		if clientID := GetClientID(r); wantClientID != clientID {
+		clientID, err := GetClientID(r)
+		if err != nil {
+			t.Fatal("GetClientID", err)
+		}
+		if wantClientID != clientID {
 			t.Errorf("want clientID == %d, got %d", wantClientID, clientID)
 		}
 	}))
@@ -27,7 +31,7 @@ func TestClientEntryPoint_PresentInCookie(t *testing.T) {
 	rt.Path(`/`).Methods("GET").Handler(h)
 	rootMux.Handle("/", rt)
 
-	c, err := makeClientIDCookie(wantClientID)
+	c, err := newClientIDCookie(wantClientID)
 	if err != nil {
 		t.Fatal("makeClientIDCookie", err)
 	}
@@ -57,7 +61,7 @@ func TestMakeClientIDCookie(t *testing.T) {
 
 		clientID := int64(7)
 
-		c, err := makeClientIDCookie(clientID)
+		c, err := newClientIDCookie(clientID)
 		if err != nil {
 			t.Fatal("makeClientIDCookie", err)
 		}
@@ -66,7 +70,7 @@ func TestMakeClientIDCookie(t *testing.T) {
 			t.Errorf("want encrypted clientID to not be plaintext, got %q", c.Value)
 		}
 
-		clientID2, err := getClientIDFromCookie(c)
+		clientID2, err := c.decodeClientID()
 		if err != nil {
 			t.Fatal("getClientIDFromCookie", err)
 		}

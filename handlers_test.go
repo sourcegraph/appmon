@@ -3,22 +3,27 @@ package track
 import (
 	"fmt"
 	"github.com/gorilla/mux"
+	"github.com/sourcegraph/go-nnz/nnz"
 	"net/http"
 	"reflect"
 	"testing"
 	"time"
 )
 
-func TestTrackCall_NoViewID(t *testing.T) {
+func TestTrackAPICall_NoAssociatedView(t *testing.T) {
 	dbSetUp()
 	httpSetUp()
 	defer dbTearDown()
 	defer httpTearDown()
 
 	var called bool
-	h := TrackCall(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	h := TrackAPICall(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
-		if viewID := GetViewID(r); viewID != nil {
+		viewID, err := GetViewID(r)
+		if err != nil {
+			t.Fatal("GetViewID", err)
+		}
+		if viewID != nil {
 			t.Errorf("want viewID == nil, got %+v", viewID)
 		}
 	}))
@@ -29,7 +34,7 @@ func TestTrackCall_NoViewID(t *testing.T) {
 	rootMux.Handle("/", rt)
 
 	wantCall := &Call{
-		RequestURI:  "/abc/alice/123?foo=bar",
+		URL:         "/abc/alice/123?foo=bar",
 		Route:       routeName,
 		RouteParams: map[string]interface{}{"name": "alice", "id": "123"},
 		QueryParams: map[string]interface{}{"foo": []interface{}{"bar"}},
@@ -56,17 +61,21 @@ func TestTrackCall_NoViewID(t *testing.T) {
 	}
 }
 
-func TestTrackCall_ViewID(t *testing.T) {
+func TestTrackAPICall_WithAssociatedView(t *testing.T) {
 	dbSetUp()
 	httpSetUp()
 	defer dbTearDown()
 	defer httpTearDown()
 
-	wantViewID := &ViewID{123, 456}
+	wantViewID := &ViewID{Instance: 123, Seq: 456}
 	var called bool
-	h := TrackCall(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	h := TrackAPICall(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
-		if viewID := GetViewID(r); !reflect.DeepEqual(wantViewID, viewID) {
+		viewID, err := GetViewID(r)
+		if err != nil {
+			t.Fatal("GetViewID", err)
+		}
+		if !reflect.DeepEqual(wantViewID, viewID) {
 			t.Errorf("want viewID == %+v, got %+v", wantViewID, viewID)
 		}
 	}))
@@ -75,7 +84,7 @@ func TestTrackCall_ViewID(t *testing.T) {
 	rt.Path(`/`).Methods("GET").Handler(h)
 	rootMux.Handle("/", rt)
 
-	wantCall := &Call{View: wantViewID}
+	wantCall := &Call{Instance: wantViewID.Instance, ViewSeq: nnz.Int(wantViewID.Seq)}
 
 	httpGet(t, serverURL.String(), ViewIDHeader, makeViewIDHeader(*wantViewID))
 
@@ -84,14 +93,13 @@ func TestTrackCall_ViewID(t *testing.T) {
 		t.Errorf("!called")
 	}
 	call := getOnlyOneCall(t)
-	// ID and Date vary, so don't bother checking them.
-	if !reflect.DeepEqual(wantCall.View, call.View) {
-		t.Errorf("want call.View == %+v, got %+v", wantCall.View, call.View)
+	if !reflect.DeepEqual(wantCall.ViewID(), call.ViewID()) {
+		t.Errorf("want call.View == %+v, got %+v", wantCall.ViewID(), call.ViewID())
 	}
 }
 
 func makeViewIDHeader(id ViewID) string {
-	return fmt.Sprintf("%d %d", id.Win, id.Seq)
+	return fmt.Sprintf("%d %d", id.Instance, id.Seq)
 }
 
 // getOnlyOneCall returns the only Call in the database if there is exactly 1
@@ -120,8 +128,8 @@ func TestParseViewIDHeader(t *testing.T) {
 		} else if !test.err && err != nil {
 			t.Fatal("%q: want err == nil, got %q", test.input, err)
 		}
-		if test.want != got {
-			t.Errorf("%q: want viewID == %+v, got %+v", test.input, test.want, got)
+		if test.want != *got {
+			t.Errorf("%q: want viewID == %+v, got %+v", test.input, test.want, *got)
 		}
 	}
 }

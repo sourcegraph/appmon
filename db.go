@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	_ "github.com/lib/pq"
-	"github.com/sourcegraph/go-nnz/nnz"
 )
 
 // DBH is a database handle that is agnostic to whether it is a database
@@ -43,24 +42,32 @@ func InitDB() (err error) {
 	_, err = DB.Exec(`
 CREATE SCHEMA "` + DBSchema + `";
 CREATE SEQUENCE "` + DBSchema + `".client_id_sequence;
-CREATE SEQUENCE "` + DBSchema + `".win_sequence;
-CREATE TABLE "` + DBSchema + `".view (
-  win int NOT NULL,
-  seq int NOT NULL,
+CREATE SEQUENCE "` + DBSchema + `".instance_sequence;
+CREATE TABLE "` + DBSchema + `".instance (
+  id serial NOT NULL,
   "user" varchar(32) NULL,
   client_id bigint NOT NULL,
+  url varchar(255) NOT NULL,
+  referrer_url varchar(255) NOT NULL,
+  ip_addr varchar(15) NOT NULL,
+  user_agent varchar(255) NOT NULL,
+  start timestamp(3) NOT NULL,
+  CONSTRAINT instance_pkey PRIMARY KEY (id)
+);
+CREATE TABLE "` + DBSchema + `".view (
+  instance int NOT NULL,
+  seq int NOT NULL,
+  request_uri varchar(255) NOT NULL,
   state varchar(32) NOT NULL,
-  params bytea NOT NULL,
+  state_params bytea NOT NULL,
   date timestamp(3) NOT NULL,
-  CONSTRAINT view_pkey PRIMARY KEY (win, seq)
+  CONSTRAINT view_pkey PRIMARY KEY (instance, seq)
 );
 CREATE TABLE "` + DBSchema + `".call (
   id serial NOT NULL,
-  view_win int NULL,
+  instance int NOT NULL,
   view_seq int NULL,
-  "user" varchar(32) NULL,
-  client_id bigint NOT NULL,
-  request_uri varchar(128) NOT NULL,
+  url varchar(255) NOT NULL,
   route varchar(32) NOT NULL,
   route_params bytea NOT NULL,
   query_params bytea NOT NULL,
@@ -81,23 +88,43 @@ CREATE TABLE "` + DBSchema + `".call_status (
 
 // DropDBSchema drops the database schema and tables.
 func DropDBSchema() (err error) {
-	_, err = DB.Exec(`DROP SCHEMA IF EXISTS "` + DBSchema + `" CASCADE;`)
+	_, err = DB.Exec(`DROP SCHEMA IF EXISTS "` + DBSchema + `" CASCADE`)
 	return
 }
 
-// NextWin returns the next win ID from the PostgreSQL sequence.
-func NextWin() (win int, err error) {
-	row := DB.QueryRow(`SELECT nextval('"` + DBSchema + `".win_sequence')`)
-	err = row.Scan(&win)
+// InsertInstance adds an instance to the database.
+func InsertInstance(o *Instance) (err error) {
+	return DB.QueryRow(`
+INSERT INTO "`+DBSchema+`".instance("user", client_id, url, referrer_url, ip_addr, user_agent, start)
+VALUES($1, $2, $3, $4, $5, $6, $7)
+RETURNING id
+`, o.User, o.ClientID, o.URL, o.ReferrerURL, o.IPAddress, o.UserAgent, o.Start).Scan(&o.ID)
+}
+
+// QueryInstances returns all instances matching the SQL query conditions.
+func QueryInstances(query string, args ...interface{}) (instances []*Instance, err error) {
+	var rows *sql.Rows
+	rows, err = DB.Query(`SELECT instance.* FROM "`+DBSchema+`".instance `+query, args...)
+	if err != nil {
+		return
+	}
+	for rows.Next() {
+		o := new(Instance)
+		err = rows.Scan(&o.ID, &o.User, &o.ClientID, &o.URL, &o.ReferrerURL, &o.IPAddress, &o.UserAgent, &o.Start)
+		if err != nil {
+			return
+		}
+		instances = append(instances, o)
+	}
 	return
 }
 
 // InsertView adds a view to the database.
 func InsertView(v *View) (err error) {
 	_, err = DB.Exec(`
-INSERT INTO "`+DBSchema+`".view(win, seq, "user", client_id, state, params, date)
-VALUES($1, $2, $3, $4, $5, $6, $7)
-`, v.Win, v.Seq, v.User, v.ClientID, v.State, v.Params, v.Date)
+INSERT INTO "`+DBSchema+`".view(instance, seq, request_uri, state, state_params, date)
+VALUES($1, $2, $3, $4, $5, $6)
+`, v.Instance, v.Seq, v.RequestURI, v.State, v.StateParams, v.Date)
 	return
 }
 
@@ -110,7 +137,7 @@ func QueryViews(query string, args ...interface{}) (views []*View, err error) {
 	}
 	for rows.Next() {
 		v := new(View)
-		err = rows.Scan(&v.Win, &v.Seq, &v.User, &v.ClientID, &v.State, &v.Params, &v.Date)
+		err = rows.Scan(&v.Instance, &v.Seq, &v.RequestURI, &v.State, &v.StateParams, &v.Date)
 		if err != nil {
 			return
 		}
@@ -121,14 +148,10 @@ func QueryViews(query string, args ...interface{}) (views []*View, err error) {
 
 // InsertCall adds a Call to the database.
 func InsertCall(c *Call) (err error) {
-	var win, seq *int
-	if c.View != nil {
-		win, seq = &c.View.Win, &c.View.Seq
-	}
 	return DB.QueryRow(`
-INSERT INTO "`+DBSchema+`".call(view_win, view_seq, "user", client_id, request_uri, route, route_params, query_params, date)
-VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id
-`, win, seq, c.User, c.ClientID, c.RequestURI, c.Route, c.RouteParams, c.QueryParams, c.Date).Scan(&c.ID)
+INSERT INTO "`+DBSchema+`".call(instance, view_seq, url, route, route_params, query_params, date)
+VALUES($1, $2, $3, $4, $5, $6, $7) RETURNING id
+`, c.Instance, c.ViewSeq, c.URL, c.Route, c.RouteParams, c.QueryParams, c.Date).Scan(&c.ID)
 }
 
 // QueryCalls returns all calls matching the SQL query conditions.
@@ -140,15 +163,12 @@ func QueryCalls(query string, args ...interface{}) (calls []*Call, err error) {
 	}
 	for rows.Next() {
 		c := new(Call)
-		var win, seq nnz.Int
 		err = rows.Scan(
-			&c.ID, &win, &seq, &c.User, &c.ClientID, &c.RequestURI, &c.Route, &c.RouteParams, &c.QueryParams, &c.Date,
+			&c.ID, &c.Instance, &c.ViewSeq, &c.URL, &c.Route,
+			&c.RouteParams, &c.QueryParams, &c.Date,
 		)
 		if err != nil {
 			return
-		}
-		if win != 0 && seq != 0 {
-			c.View = &ViewID{Win: int(win), Seq: int(seq)}
 		}
 		calls = append(calls, c)
 	}

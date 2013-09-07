@@ -16,22 +16,26 @@ type ClientConfig struct {
 	NewViewURL string
 }
 
-// ClientData contains client-specific information that the client requires to
-// send tracking information to the server.
-type ClientData struct {
-	// Win is the value that should be associated with all views and
-	// calls originating from this window.
-	Win int
-}
-
 func MakeClientConfig(rt *mux.Router) (config *ClientConfig, err error) {
-	newViewURL, err := rt.GetRoute(trackCreateView).URL("win", ":win")
+	newViewURL, err := rt.GetRoute(trackCreateView).URL("instance", ":instance")
 	if err != nil {
 		return
 	}
 	return &ClientConfig{
 		NewViewURL: newViewURL.String(),
 	}, nil
+}
+
+// ClientData contains client-specific information that the client requires to
+// send tracking information to the server.
+type ClientData struct {
+	// Instance is the value that should be associated with all views and
+	// calls originating from this instance.
+	Instance int
+}
+
+func NewClientData(r *http.Request) (data *ClientData) {
+	return &ClientData{Instance: GetInstance(r)}
 }
 
 // CurrentUser, if set, is called to determine the currently authenticated user
@@ -42,27 +46,53 @@ var CurrentUser func(r *http.Request) (user string, err error)
 const (
 	trackQueryCalls = "track:queryCalls"
 
+	trackGetInstance = "track:getInstance"
+
 	trackCreateView = "track:createView"
 	trackQueryViews = "track:queryViews"
 )
 
 func APIRouter(rt *mux.Router) *mux.Router {
-	wins := rt.PathPrefix("/wins").Subrouter()
-	win := wins.PathPrefix("/{win}").Subrouter()
+	instances := rt.PathPrefix("/instances").Subrouter()
 
-	win.Path("/views").Methods("POST").Handler(storeClientID(http.HandlerFunc(createView))).Name(trackCreateView)
-	win.Path("/views").Methods("GET").HandlerFunc(queryViews).Name(trackQueryViews)
+	instances.Path("/{instance}").Methods("GET").HandlerFunc(getInstance).Name(trackGetInstance)
+	instance := instances.PathPrefix("/{instance}").Subrouter()
 
-	view := win.PathPrefix("/views/{seq}").Subrouter()
+	instance.Path("/views").Methods("POST").HandlerFunc(createView).Name(trackCreateView)
+	instance.Path("/views").Methods("GET").HandlerFunc(queryViews).Name(trackQueryViews)
+
+	view := instance.PathPrefix("/views/{seq}").Subrouter()
 
 	view.Path("/calls").Methods("GET").HandlerFunc(queryCalls).Name(trackQueryCalls)
 	return rt
 }
 
+func getInstance(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id, err := strconv.Atoi(vars["instance"])
+	if err != nil || id <= 0 {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	instances, err := QueryInstances("WHERE id = $1", id)
+	if err != nil {
+		log.Printf("QueryInstances failed: %s", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if len(instances) == 1 {
+		json.NewEncoder(w).Encode(instances[0])
+	} else {
+		http.NotFound(w, r)
+	}
+}
+
 func createView(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	win, err := strconv.Atoi(vars["win"])
-	if err != nil || win <= 0 {
+	instance, err := strconv.Atoi(vars["instance"])
+	if err != nil || instance <= 0 {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -75,20 +105,13 @@ func createView(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if v.Win != win {
-		log.Printf("View.Win (%d) != win route parameter (%d)", v.Win, win)
+	if v.Instance != instance {
+		log.Printf("View.Instance (%d) != instance route parameter (%d)", v.Instance, instance)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	v.Date = time.Now()
-	v.Client, err = getClient(r)
-	if err != nil {
-		log.Printf("getClient: %s", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
 	err = InsertView(v)
 	if err != nil {
 		log.Printf("InsertView: %s", err)
@@ -99,13 +122,13 @@ func createView(w http.ResponseWriter, r *http.Request) {
 
 func queryViews(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	win, err := strconv.Atoi(vars["win"])
-	if err != nil || win <= 0 {
+	instance, err := strconv.Atoi(vars["instance"])
+	if err != nil || instance <= 0 {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	views, err := QueryViews("WHERE win = $1", win)
+	views, err := QueryViews("WHERE instance = $1", instance)
 	if err != nil {
 		log.Printf("QueryViews: %s", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -120,8 +143,8 @@ func queryViews(w http.ResponseWriter, r *http.Request) {
 
 func queryCalls(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	win, err := strconv.Atoi(vars["win"])
-	if err != nil || win <= 0 {
+	instance, err := strconv.Atoi(vars["instance"])
+	if err != nil || instance <= 0 {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -131,7 +154,7 @@ func queryCalls(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	calls, err := QueryCalls("WHERE view_win = $1 AND view_seq = $2", win, seq)
+	calls, err := QueryCalls("WHERE instance = $1 AND view_seq = $2", instance, seq)
 	if err != nil {
 		log.Printf("QueryCalls: %s", err)
 		w.WriteHeader(http.StatusInternalServerError)

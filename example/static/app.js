@@ -59,14 +59,17 @@ angular.module('example', [
   return $resource('/api/contacts/:id');
 })
 
-.controller('ConfigCtrl', function($scope, TrackClientConfig, TrackCurrentView) {
+.controller('ConfigCtrl', function($scope, Instance, TrackClientConfig, TrackCurrentView) {
   $scope.TrackClientConfig = TrackClientConfig;
   $scope.TrackCurrentView = TrackCurrentView;
+  $scope.instance = Instance.get({instance: TrackCurrentView.Instance});
 })
 
 .controller('CallsCtrl', function($rootScope, $scope, $timeout, Call, TrackCurrentView) {
   function reload() {
-    $scope.calls = Call.query({win: TrackCurrentView.Win, seq: TrackCurrentView.Seq});
+    Call.query({instance: TrackCurrentView.Instance, seq: TrackCurrentView.Seq}).$promise.then(function(calls) {
+      $scope.calls = calls;
+    });
   }
   $rootScope.$on('$stateChangeSuccess', function() {
     reload();
@@ -79,16 +82,20 @@ angular.module('example', [
 
 .controller('ViewsCtrl', function($rootScope, $scope, View, TrackCurrentView) {
   $rootScope.$on('$stateChangeSuccess', function() {
-    $scope.views = View.query({win: TrackCurrentView.Win});
+    $scope.views = View.query({instance: TrackCurrentView.Instance});
   });
 })
 
-.factory('View', function($resource) {
-  return $resource('/api/track/wins/:win/views/:seq');
+.factory('Instance', function($resource) {
+  return $resource('/api/track/instances/:instance');
 })
 
 .factory('Call', function($resource) {
-  return $resource('/api/track/wins/:win/views/:seq/calls/:call');
+  return $resource('/api/track/instances/:instance/views/:seq/calls/:call');
+})
+
+.factory('View', function($resource) {
+  return $resource('/api/track/instances/:instance/views/:seq');
 })
 
 ;

@@ -5,40 +5,66 @@ import (
 	"time"
 )
 
-// Client identifies the originator of a tracked action.
-type Client struct {
-	// User is the ID of the user who viewed the application state, or null if
-	// the client is not logged in.
-	User nnz.String
+// ClientInfo represents additional information about a client.
+type ClientInfo struct {
+	// IPAddress is the client's IP address, in dotted string notation (e.g., "1.2.3.4").
+	IPAddress string
 
-	// ClientID is the unique ID associated with the client.
-	ClientID int64
+	// UserAgent is the client's User-Agent string.
+	UserAgent string
 }
 
-// View represents an instance of a client viewing an application state.
+// Instance represents a single instantiation of the app; e.g., all of the
+// activity that occurs in one browser tab, starting with loading the
+// initial static base page.
+type Instance struct {
+	// ID is the primary key.
+	ID int
+
+	// ClientID is the unique ID assigned to the client, stored in a cookie.
+	ClientID int64
+
+	// User is the login of the current user, or "" if the user is not logged in.
+	User nnz.String
+
+	// URL is the original (i.e., first) URL requested by the client in this instance.
+	URL string
+
+	// ReferrerURL is the value of the HTTP "Referer" header.
+	ReferrerURL string
+
+	ClientInfo
+
+	// Start is when the application was instantiated.
+	Start time.Time
+}
+
+// ViewID is the primary key for a View.
+type ViewID struct {
+	// Instance is the ID of the app instance that this view occurred in.
+	Instance int
+
+	// Seq is the sequence number of this view in the instance, incremented by the client.
+	Seq int
+}
+
+// View represents a client's viewing an application state.
 type View struct {
 	ViewID
 
-	Client
+	// RequestURI is the request URI of the URL in the client's address bar
+	// after the state has loaded. The host and port of the URL are guaranteed
+	// to be the same as that of the instance's URL.
+	RequestURI string
 
 	// State is the name of the application state that was viewed.
 	State string
 
-	// Params is a map of the state parameters for this view.
-	Params Params
+	// StateParams is a map of the state parameters for this view.
+	StateParams Params
 
 	// Date is when the view occurred.
 	Date time.Time
-}
-
-// ViewID is the primary key for a view.
-type ViewID struct {
-	// Win is a unique ID assigned to the client at the initialization time
-	// of the application.
-	Win int
-
-	// Seq is the sequence number of this view in the win, incremented by the client.
-	Seq int
 }
 
 // Call represents an API call made by a client.
@@ -46,15 +72,17 @@ type Call struct {
 	// ID is the unique ID of this call.
 	ID int64
 
-	// View is the ID of the current view of the client that initiated this request.
-	View *ViewID
+	// Instance is the ID of the instance that this call occurred in.
+	Instance int
 
-	Client
+	// ViewSeq is current view seq at the time the client initiated this
+	// call. It is nonzero only if the client sends the X-Track-View header.
+	ViewSeq nnz.Int
 
-	// RequestURI is the portion of the requested URL after the host and port.
-	RequestURI string
+	// URL is the full URL of the request.
+	URL string
 
-	// Route is the name of the route whose handler received this request.
+	// Route is the name of the route used to handle this request.
 	Route string
 
 	// RouteParams is a map of the route parameters in the request.
@@ -65,6 +93,10 @@ type Call struct {
 
 	// Date is when the request occurred.
 	Date time.Time
+}
+
+func (c *Call) ViewID() *ViewID {
+	return &ViewID{Instance: c.Instance, Seq: int(c.ViewSeq)}
 }
 
 // CallStatus represents status information that is collected after a call.

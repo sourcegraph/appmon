@@ -1,10 +1,10 @@
 angular.module('track', [])
 
-.constant('TrackCurrentView', {Seq: -1})
+.constant('TrackCurrentView', {Seq: 0})
 
 .config(['$httpProvider', 'TrackCurrentView', function($httpProvider, TrackCurrentView) {
   $httpProvider.defaults.transformRequest.push(function(data, headers) {
-    headers()['X-Track-View'] = '' + TrackCurrentView.Win + ' ' + TrackCurrentView.Seq;
+    headers()['X-Track-View'] = '' + TrackCurrentView.Instance + ' ' + TrackCurrentView.Seq;
     return data;
   });
 }])
@@ -13,7 +13,7 @@ angular.module('track', [])
   $rootScope.$on('$stateChangeStart', function(ev, to, toParams) {
     Track.view(to.name, toParams);
   });
-  TrackCurrentView.Win = TrackClientData.Win;
+  TrackCurrentView.Instance = TrackClientData.Instance;
 }])
 
 .factory('TrackClientConfig', ['$log', '$window', function($log, $window) {
@@ -32,13 +32,14 @@ angular.module('track', [])
   return data;
 }])
 
-.factory('Track', ['$http', 'TrackClientConfig', 'TrackCurrentView', function($http, cfg, currentView) {
+.factory('Track', ['$http', '$location', 'TrackClientConfig', 'TrackCurrentView', function($http, $location, cfg, currentView) {
   return {
     view: function(stateName, stateParams) {
       currentView.Seq++;
+      currentView.RequestURI = $location.url();
       currentView.State = stateName;
-      currentView.Params = stateParams;
-      $http.post(cfg.NewViewURL.replace(':win', currentView.Win), currentView);
+      currentView.StateParams = stateParams;
+      $http.post(cfg.NewViewURL.replace(':instance', currentView.Instance), currentView);
     },
   };
 }])

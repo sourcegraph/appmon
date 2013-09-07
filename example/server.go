@@ -47,9 +47,9 @@ func main() {
 	rt.PathPrefix("/static/angular-track").Handler(http.StripPrefix("/static/angular-track", http.FileServer(http.Dir(assetPath("../angular-track")))))
 	rt.PathPrefix("/static").Handler(http.StripPrefix("/static", http.FileServer(http.Dir(assetPath("static")))))
 	track.APIRouter(rt.PathPrefix("/api/track").Subrouter())
-	rt.PathPrefix("/api/contacts/{id:[0-9]+}").Methods("GET").Handler(track.TrackCall(http.HandlerFunc(getContact))).Name("getContact")
-	rt.PathPrefix("/api/contacts").Methods("GET").Handler(track.TrackCall(http.HandlerFunc(queryContacts))).Name("queryContacts")
-	rt.Path("/{path:.*}").Handler(track.ClientEntryPoint(http.HandlerFunc(app)))
+	rt.PathPrefix("/api/contacts/{id:[0-9]+}").Methods("GET").Handler(track.TrackAPICall(http.HandlerFunc(getContact))).Name("getContact")
+	rt.PathPrefix("/api/contacts").Methods("GET").Handler(track.TrackAPICall(http.HandlerFunc(queryContacts))).Name("queryContacts")
+	rt.Path("/{path:.*}").Handler(track.InstantiateApp(http.HandlerFunc(app)))
 	http.Handle("/", rt)
 
 	clientConfig, err = track.MakeClientConfig(rt)
@@ -74,20 +74,13 @@ func assetPath(path string) string {
 }
 
 func app(w http.ResponseWriter, r *http.Request) {
-	win, err := track.NextWin()
-	if err != nil {
-		log.Printf("NextWin failed: %s", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
 	tmpl := template.Must(template.ParseFiles(assetPath("app.tpl.html")))
-	err = tmpl.Execute(w, struct {
+	err := tmpl.Execute(w, struct {
 		Config *track.ClientConfig
 		Data   *track.ClientData
 	}{
 		Config: clientConfig,
-		Data:   &track.ClientData{Win: win},
+		Data:   track.NewClientData(r),
 	})
 	if err != nil {
 		log.Printf("Template execution failed: %s", err)

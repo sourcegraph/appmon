@@ -58,23 +58,56 @@ func dbTearDown() {
 	}
 }
 
+func TestInsertInstance(t *testing.T) {
+	dbSetUp()
+	defer dbTearDown()
+
+	o := &Instance{
+		ClientID:    123,
+		User:        "alice",
+		URL:         "http://example.com/foo",
+		ReferrerURL: "http://example.com/bar",
+		ClientInfo:  ClientInfo{IPAddress: "1.2.3.4", UserAgent: "abc agent"},
+		Start:       dbNow(),
+	}
+
+	err := InsertInstance(o)
+	if err != nil {
+		t.Fatal("InsertInstance", err)
+	}
+
+	o2 := getOnlyOneInstance(t)
+	if !reflect.DeepEqual(o, o2) {
+		t.Errorf("want %v, got %v", o, o2)
+	}
+}
+
+// getOnlyOneInstance returns the only Instance in the database if there is exactly 1
+// Instance in the database, and calls t.Fatalf otherwise.
+func getOnlyOneInstance(t *testing.T) *Instance {
+	instances, err := QueryInstances("")
+	if err != nil {
+		t.Fatal("QueryInstances", err)
+	}
+	if len(instances) != 1 {
+		t.Fatalf("want len(instances) == 1, got %d", len(instances))
+	}
+	return instances[0]
+}
+
 func TestInsertView(t *testing.T) {
 	dbSetUp()
 	defer dbTearDown()
 
-	w, err := NextWin()
-	if err != nil {
-		t.Fatal("NextWin", err)
-	}
 	v := &View{
-		ViewID: ViewID{Win: w, Seq: 123},
-		Client: Client{User: "alice"},
-		State:  "my.state",
-		Params: map[string]interface{}{"k": "v"},
-		Date:   dbNow(),
+		ViewID:      ViewID{Instance: 123, Seq: 456},
+		RequestURI:  "/foo",
+		State:       "my.state",
+		StateParams: map[string]interface{}{"k": "v"},
+		Date:        dbNow(),
 	}
 
-	err = InsertView(v)
+	err := InsertView(v)
 	if err != nil {
 		t.Fatal("InsertView", err)
 	}
@@ -94,7 +127,8 @@ func TestInsertCall(t *testing.T) {
 	defer dbTearDown()
 
 	c := &Call{
-		RequestURI:  "/abc",
+		Instance:    123,
+		ViewSeq:     456,
 		Route:       "my-route",
 		RouteParams: map[string]interface{}{"k1": "v1"},
 		QueryParams: map[string]interface{}{"k2": "v2"},

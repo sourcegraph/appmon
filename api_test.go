@@ -11,7 +11,7 @@ func TestMakeClientConfig(t *testing.T) {
 	APIRouter(rt)
 
 	want := &ClientConfig{
-		NewViewURL: "/wins/:win/views",
+		NewViewURL: "/instances/:instance/views",
 	}
 
 	got, err := MakeClientConfig(rt)

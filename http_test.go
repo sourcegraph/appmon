@@ -32,7 +32,7 @@ func httpTearDown() {
 	server.Close()
 }
 
-func httpGet(t *testing.T, url string, headerKey, headerVal string) {
+func httpGet(t *testing.T, url string, headerKey, headerVal string) (res *http.Response) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		t.Fatal("http.NewRequest", err)
@@ -42,8 +42,9 @@ func httpGet(t *testing.T, url string, headerKey, headerVal string) {
 		req.Header.Add(headerKey, headerVal)
 	}
 
-	_, err = http.DefaultClient.Do(req)
+	res, err = http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal("http.DefaultClient.Do", err)
 	}
+	return
 }
