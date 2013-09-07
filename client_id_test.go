@@ -4,6 +4,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/gorilla/securecookie"
 	"net/http"
+	"strconv"
 	"testing"
 )
 
@@ -54,11 +55,15 @@ func TestMakeClientIDCookie(t *testing.T) {
 	for _, test := range tests {
 		SecureCookie = test.sc
 
-		clientID := int64(123)
+		clientID := int64(7)
 
 		c, err := makeClientIDCookie(clientID)
 		if err != nil {
 			t.Fatal("makeClientIDCookie", err)
+		}
+
+		if test.sc != nil && (len(c.Value) < 10 || c.Value == strconv.FormatInt(clientID, clientIDCookieValueBase)) {
+			t.Errorf("want encrypted clientID to not be plaintext, got %q", c.Value)
 		}
 
 		clientID2, err := getClientIDFromCookie(c)

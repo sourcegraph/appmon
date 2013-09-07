@@ -71,10 +71,12 @@ func storeClientID(h http.Handler) http.Handler {
 	})
 }
 
+const clientIDCookieValueBase = 36
+
 func makeClientIDCookie(clientID int64) (c *http.Cookie, err error) {
 	c = &http.Cookie{
 		Name:    clientIDCookieName,
-		Value:   strconv.FormatInt(clientID, 36),
+		Value:   strconv.FormatInt(clientID, clientIDCookieValueBase),
 		Path:    "/",
 		Expires: time.Now().Add(time.Hour * 24 * 365 * 10),
 	}
