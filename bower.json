@@ -5,7 +5,7 @@
   "authors": [
     "Quinn Slack <sqs@sourcegraph.com>"
   ],
-  "description": "Tracks user actions and API calls in a Web application",
+  "description": "Tracks user actions and API calls in Web applications that use Go and AngularJS (with Angular UI Router)",
   "main": "./angular-track/angular-track.js",
   "license": "MIT",
   "ignore": [
