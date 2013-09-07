@@ -49,7 +49,7 @@ CREATE TABLE "` + DBSchema + `".view (
   "user" varchar(32) NULL,
   client_id bigint NOT NULL,
   state varchar(32) NOT NULL,
-  params json NOT NULL,
+  params bytea NOT NULL,
   date timestamp(3) NOT NULL,
   CONSTRAINT view_pkey PRIMARY KEY (win, seq)
 );
@@ -59,8 +59,8 @@ CREATE TABLE "` + DBSchema + `".call (
   view_seq int NULL,
   request_uri varchar(128) NOT NULL,
   route varchar(32) NOT NULL,
-  route_params json NOT NULL,
-  query_params json NOT NULL,
+  route_params bytea NOT NULL,
+  query_params bytea NOT NULL,
   date timestamp(3) NOT NULL,
   CONSTRAINT call_pkey PRIMARY KEY (id)
 );
