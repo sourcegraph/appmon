@@ -1,6 +1,8 @@
 package track
 
 import (
+	"bufio"
+	"net"
 	"net/http"
 )
 
@@ -36,4 +38,8 @@ func (rw *responseRecorder) Write(buf []byte) (int, error) {
 func (rw *responseRecorder) WriteHeader(code int) {
 	rw.Code = code
 	rw.underlying.WriteHeader(code)
+}
+
+func (rw *responseRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	return rw.underlying.(http.Hijacker).Hijack()
 }
