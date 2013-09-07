@@ -8,3 +8,6 @@ before_script:
 
 env:
   - PGDATABASE=track_test PGUSER=postgres
+
+script:
+  - go test -test.initdb -test.dropdb -test.v
