@@ -48,6 +48,8 @@ type Call struct {
 	// View is the ID of the current view of the client that initiated this request.
 	View *ViewID
 
+	Client
+
 	// RequestURI is the portion of the requested URL after the host and port.
 	RequestURI string
 

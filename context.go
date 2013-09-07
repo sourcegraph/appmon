@@ -39,3 +39,15 @@ func GetClientID(r *http.Request) (id int64) {
 func setClientID(r *http.Request, id int64) {
 	context.Set(r, clientID, id)
 }
+
+func getClient(r *http.Request) (c Client, err error) {
+	c.ClientID = GetClientID(r)
+	if CurrentUser != nil {
+		c.User.String, err = CurrentUser(r)
+		if err != nil {
+			return
+		}
+		c.User.Valid = (c.User.String != "")
+	}
+	return
+}

@@ -24,15 +24,25 @@ func storeCall(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Assumes that the storeViewID handler has already run.
 		viewID := GetViewID(r)
+
+		// Assumes that the storeClientID handler has already run.
+		client, err := getClient(r)
+		if err != nil {
+			log.Printf("getClient: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
 		c := &Call{
 			View:        viewID,
+			Client:      client,
 			RequestURI:  r.RequestURI,
 			Route:       mux.CurrentRoute(r).GetName(),
 			RouteParams: mapStringStringAsParams(mux.Vars(r)),
 			QueryParams: mapStringSliceOfStringAsParams(r.URL.Query()),
 			Date:        time.Now(),
 		}
-		err := InsertCall(c)
+		err = InsertCall(c)
 		if err != nil {
 			log.Printf("InsertCall failed: %s", err)
 			w.WriteHeader(http.StatusInternalServerError)

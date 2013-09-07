@@ -57,6 +57,8 @@ CREATE TABLE "` + DBSchema + `".call (
   id serial NOT NULL,
   view_win int NULL,
   view_seq int NULL,
+  "user" varchar(32) NULL,
+  client_id bigint NOT NULL,
   request_uri varchar(128) NOT NULL,
   route varchar(32) NOT NULL,
   route_params bytea NOT NULL,
@@ -123,9 +125,9 @@ func InsertCall(c *Call) (err error) {
 		win, seq = &c.View.Win, &c.View.Seq
 	}
 	return DB.QueryRow(`
-INSERT INTO "`+DBSchema+`".call(view_win, view_seq, request_uri, route, route_params, query_params, date)
-VALUES($1, $2, $3, $4, $5, $6, $7) RETURNING id
-`, win, seq, c.RequestURI, c.Route, c.RouteParams, c.QueryParams, c.Date).Scan(&c.ID)
+INSERT INTO "`+DBSchema+`".call(view_win, view_seq, "user", client_id, request_uri, route, route_params, query_params, date)
+VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id
+`, win, seq, c.User, c.ClientID, c.RequestURI, c.Route, c.RouteParams, c.QueryParams, c.Date).Scan(&c.ID)
 }
 
 // QueryCalls returns all calls matching the SQL query conditions.
@@ -139,7 +141,7 @@ func QueryCalls(query string, args ...interface{}) (calls []*Call, err error) {
 		c := new(Call)
 		var win, seq NullInt
 		err = rows.Scan(
-			&c.ID, &win, &seq, &c.RequestURI, &c.Route, &c.RouteParams, &c.QueryParams, &c.Date,
+			&c.ID, &win, &seq, &c.User, &c.ClientID, &c.RequestURI, &c.Route, &c.RouteParams, &c.QueryParams, &c.Date,
 		)
 		if err != nil {
 			return

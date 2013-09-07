@@ -82,17 +82,11 @@ func createView(w http.ResponseWriter, r *http.Request) {
 	}
 
 	v.Date = time.Now()
-	v.Client = Client{ClientID: GetClientID(r)}
-	if CurrentUser != nil {
-		user, err := CurrentUser(r)
-		if err != nil {
-			log.Printf("CurrentUser failed: %s", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		if user != "" {
-			v.Client.User = NullString{user, true}
-		}
+	v.Client, err = getClient(r)
+	if err != nil {
+		log.Printf("getClient: %s", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 
 	err = InsertView(v)
