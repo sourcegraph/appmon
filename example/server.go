@@ -17,6 +17,8 @@ var dir = flag.String("dir", "example", "path to github.com/sourcegraph/track/ex
 var dropDB = flag.Bool("dropdb", false, "drop the database before initializing it")
 var initDB = flag.Bool("initdb", false, "initialize the database before running")
 
+var authUser = flag.String("user", "alice", "consider all HTTP requests as authenticated as this user")
+
 var clientConfig *track.ClientConfig
 
 func main() {
@@ -52,6 +54,10 @@ func main() {
 	clientConfig, err = track.MakeClientConfig(rt)
 	if err != nil {
 		log.Fatalf("track.MakeClientConfig: %s", err)
+	}
+
+	track.CurrentUser = func(r *http.Request) (user string, err error) {
+		return *authUser, nil
 	}
 
 	log.Printf("Listening on %s", *bind)

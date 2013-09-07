@@ -34,6 +34,11 @@ func MakeClientConfig(rt *mux.Router) (config *ClientConfig, err error) {
 	}, nil
 }
 
+// CurrentUser, if set, is called to determine the currently authenticated user
+// for the current request. The returned user ID is stored in the View record if
+// nonempty. If err != nil, an HTTP 500 is returned.
+var CurrentUser func(r *http.Request) (user string, err error)
+
 const (
 	trackQueryCalls = "track:queryCalls"
 
@@ -78,6 +83,18 @@ func createView(w http.ResponseWriter, r *http.Request) {
 
 	v.Date = time.Now()
 	v.Client = Client{ClientID: GetClientID(r)}
+	if CurrentUser != nil {
+		user, err := CurrentUser(r)
+		if err != nil {
+			log.Printf("CurrentUser failed: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		if user != "" {
+			v.Client.User = NullString{user, true}
+		}
+	}
+
 	err = InsertView(v)
 	if err != nil {
 		log.Printf("InsertView: %s", err)
