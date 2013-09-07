@@ -39,7 +39,25 @@ func storeCall(h http.Handler) http.Handler {
 			return
 		}
 
-		h.ServeHTTP(w, r)
+		status := CallStatus{
+			CallID:   c.ID,
+			Panicked: true, // assume the worst, set false if no panic
+		}
+		start := time.Now()
+		rw := newRecorder(w)
+		defer func() {
+			status.Duration = time.Since(start).Nanoseconds()
+			status.BodyLength = rw.BodyLength
+			status.HTTPStatusCode = rw.Code
+			err := InsertCallStatus(&status)
+			if err != nil {
+				log.Printf("warn: UpdateCallStatus failed (ID=%d): %s", c.ID, err)
+			}
+		}()
+
+		h.ServeHTTP(rw, r)
+
+		status.Panicked = false
 	})
 }
 

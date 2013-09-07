@@ -120,6 +120,35 @@ func TestInsertCall(t *testing.T) {
 	}
 }
 
+func TestInsertCallStatus(t *testing.T) {
+	dbSetUp()
+	defer dbTearDown()
+
+	s := &CallStatus{CallID: 3, Duration: 123, BodyLength: 456, HTTPStatusCode: 200, Panicked: true}
+	err := InsertCallStatus(s)
+	if err != nil {
+		t.Fatal("InsertCallStatus", err)
+	}
+
+	s2 := getOnlyOneCallStatus(t)
+	if !reflect.DeepEqual(s, s2) {
+		t.Errorf("want CallStatus == %+v, got %+v", s, s2)
+	}
+}
+
+// getOnlyOneCallStatus returns the only CallStatus in the database if there is exactly 1
+// CallStatus in the database, and calls t.Fatalf otherwise.
+func getOnlyOneCallStatus(t *testing.T) *CallStatus {
+	statuses, err := QueryCallStatuses("")
+	if err != nil {
+		t.Fatal("QueryCallStatuses", err)
+	}
+	if len(statuses) != 1 {
+		t.Fatalf("want len(statuses) == 1, got %d", len(statuses))
+	}
+	return statuses[0]
+}
+
 // dbNow returns a time.Time of approximately now that is rounded and configured
 // so that writing it to the DB and reading it back results in an object equal
 // to the original.

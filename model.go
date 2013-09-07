@@ -64,5 +64,25 @@ type Call struct {
 	Date time.Time
 }
 
+// CallStatus represents status information that is collected after a call.
+type CallStatus struct {
+	// CallID is the call ID that this status information describes.
+	CallID int64
+
+	// Duration is the total execution time (in nanoseconds) of the inner HTTP
+	// handler, not counting handlers in the track package.
+	Duration int64
+
+	// BodyLength is the length, in bytes, of the HTTP response body.
+	BodyLength int
+
+	// HTTPStatusCode is the HTTP response status code.
+	HTTPStatusCode int
+
+	// Panicked is true iff the inner HTTP handler panicked (without recovering
+	// itself).
+	Panicked bool
+}
+
 // Params is a map of parameters for states and calls.
 type Params map[string]interface{}

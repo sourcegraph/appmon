@@ -64,6 +64,14 @@ CREATE TABLE "` + DBSchema + `".call (
   date timestamp(3) NOT NULL,
   CONSTRAINT call_pkey PRIMARY KEY (id)
 );
+CREATE TABLE "` + DBSchema + `".call_status (
+  call_id bigint NOT NULL,
+  duration bigint NOT NULL,
+  body_length int NOT NULL,
+  http_status_code int NOT NULL,
+  panicked boolean NOT NULL,
+  CONSTRAINT call_status_pkey PRIMARY KEY (call_id)
+);
 `)
 	return
 }
@@ -130,7 +138,9 @@ func QueryCalls(query string, args ...interface{}) (calls []*Call, err error) {
 	for rows.Next() {
 		c := new(Call)
 		var win, seq NullInt
-		err = rows.Scan(&c.ID, &win, &seq, &c.RequestURI, &c.Route, &c.RouteParams, &c.QueryParams, &c.Date)
+		err = rows.Scan(
+			&c.ID, &win, &seq, &c.RequestURI, &c.Route, &c.RouteParams, &c.QueryParams, &c.Date,
+		)
 		if err != nil {
 			return
 		}
@@ -138,6 +148,32 @@ func QueryCalls(query string, args ...interface{}) (calls []*Call, err error) {
 			c.View = &ViewID{Win: win.Int, Seq: seq.Int}
 		}
 		calls = append(calls, c)
+	}
+	return
+}
+
+func InsertCallStatus(s *CallStatus) (err error) {
+	_, err = DB.Exec(`
+INSERT INTO "`+DBSchema+`".call_status(call_id, duration, body_length, http_status_code, panicked)
+VALUES($1, $2, $3, $4, $5)
+`, s.CallID, s.Duration, s.BodyLength, s.HTTPStatusCode, s.Panicked)
+	return
+}
+
+// QueryCallStatuses returns all call statuses matching the SQL query conditions.
+func QueryCallStatuses(query string, args ...interface{}) (statuses []*CallStatus, err error) {
+	var rows *sql.Rows
+	rows, err = DB.Query(`SELECT call_status.* FROM "`+DBSchema+`".call_status `+query, args...)
+	if err != nil {
+		return
+	}
+	for rows.Next() {
+		s := new(CallStatus)
+		err = rows.Scan(&s.CallID, &s.Duration, &s.BodyLength, &s.HTTPStatusCode, &s.Panicked)
+		if err != nil {
+			return
+		}
+		statuses = append(statuses, s)
 	}
 	return
 }

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"strconv"
+	"strings"
 )
 
 var bind = flag.String("http", ":8888", "HTTP bind address")
@@ -104,6 +105,8 @@ var contacts = []contact{
 	{3, "Charles"},
 	{4, "David"},
 	{5, "Ellen"},
+	{6, "Frank (FAILS)"},
+	{7, "Peter (PANICS)"},
 }
 
 func queryContacts(w http.ResponseWriter, r *http.Request) {
@@ -117,5 +120,13 @@ func getContact(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
-	json.NewEncoder(w).Encode(contacts[id-1])
+	contact := contacts[id-1]
+	if strings.Contains(contact.Name, "FAILS") {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if strings.Contains(contact.Name, "PANICS") {
+		panic("contact contains PANICS")
+	}
+	json.NewEncoder(w).Encode(contact)
 }
