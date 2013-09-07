@@ -1,6 +1,6 @@
 {
   "name": "track",
-  "version": "0.0.1",
+  "version": "0.0.3",
   "homepage": "https://github.com/sourcegraph/track",
   "authors": [
     "Quinn Slack <sqs@sourcegraph.com>"
