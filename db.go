@@ -41,6 +41,7 @@ func OpenDB() (err error) {
 func InitDB() (err error) {
 	_, err = DB.Exec(`
 CREATE SCHEMA "` + DBSchema + `";
+CREATE SEQUENCE "` + DBSchema + `".client_id_sequence;
 CREATE SEQUENCE "` + DBSchema + `".win_sequence;
 CREATE TABLE "` + DBSchema + `".view (
   win int NOT NULL,

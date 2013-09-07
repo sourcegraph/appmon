@@ -46,7 +46,7 @@ func main() {
 	track.APIRouter(rt.PathPrefix("/api/track").Subrouter())
 	rt.PathPrefix("/api/contacts/{id:[0-9]+}").Methods("GET").Handler(track.TrackCall(http.HandlerFunc(getContact)))
 	rt.PathPrefix("/api/contacts").Methods("GET").Handler(track.TrackCall(http.HandlerFunc(queryContacts)))
-	rt.HandleFunc("/{path:.*}", app)
+	rt.Path("/{path:.*}").Handler(track.ClientEntryPoint(http.HandlerFunc(app)))
 	http.Handle("/", rt)
 
 	clientConfig, err = track.MakeClientConfig(rt)

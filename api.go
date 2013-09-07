@@ -45,7 +45,7 @@ func APIRouter(rt *mux.Router) *mux.Router {
 	wins := rt.PathPrefix("/wins").Subrouter()
 	win := wins.PathPrefix("/{win}").Subrouter()
 
-	win.Path("/views").Methods("POST").HandlerFunc(createView).Name(trackCreateView)
+	win.Path("/views").Methods("POST").Handler(storeClientID(http.HandlerFunc(createView))).Name(trackCreateView)
 	win.Path("/views").Methods("GET").HandlerFunc(queryViews).Name(trackQueryViews)
 
 	view := win.PathPrefix("/views/{seq}").Subrouter()
@@ -77,6 +77,7 @@ func createView(w http.ResponseWriter, r *http.Request) {
 	}
 
 	v.Date = time.Now()
+	v.Client = Client{ClientID: GetClientID(r)}
 	err = InsertView(v)
 	if err != nil {
 		log.Printf("InsertView: %s", err)

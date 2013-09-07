@@ -17,7 +17,7 @@ const ViewIDHeader = "X-Track-View"
 // TrackCall wraps an http.Handler, tracking a Call in the database describing
 // the HTTP request and response.
 func TrackCall(h http.Handler) http.Handler {
-	return storeViewID(storeCall(h))
+	return storeClientID(storeViewID(storeCall(h)))
 }
 
 func storeCall(h http.Handler) http.Handler {
