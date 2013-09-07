@@ -47,8 +47,8 @@ func main() {
 	rt.PathPrefix("/static/angular-track").Handler(http.StripPrefix("/static/angular-track", http.FileServer(http.Dir(assetPath("../angular-track")))))
 	rt.PathPrefix("/static").Handler(http.StripPrefix("/static", http.FileServer(http.Dir(assetPath("static")))))
 	track.APIRouter(rt.PathPrefix("/api/track").Subrouter())
-	rt.PathPrefix("/api/contacts/{id:[0-9]+}").Methods("GET").Handler(track.TrackCall(http.HandlerFunc(getContact)))
-	rt.PathPrefix("/api/contacts").Methods("GET").Handler(track.TrackCall(http.HandlerFunc(queryContacts)))
+	rt.PathPrefix("/api/contacts/{id:[0-9]+}").Methods("GET").Handler(track.TrackCall(http.HandlerFunc(getContact))).Name("getContact")
+	rt.PathPrefix("/api/contacts").Methods("GET").Handler(track.TrackCall(http.HandlerFunc(queryContacts))).Name("queryContacts")
 	rt.Path("/{path:.*}").Handler(track.ClientEntryPoint(http.HandlerFunc(app)))
 	http.Handle("/", rt)
 
