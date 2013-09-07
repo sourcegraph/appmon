@@ -1,6 +1,7 @@
 package track
 
 import (
+	"github.com/sourcegraph/go-nnz/nnz"
 	"time"
 )
 
@@ -8,7 +9,7 @@ import (
 type Client struct {
 	// User is the ID of the user who viewed the application state, or null if
 	// the client is not logged in.
-	User NullString
+	User nnz.String
 
 	// ClientID is the unique ID associated with the client.
 	ClientID int64

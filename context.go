@@ -2,6 +2,7 @@ package track
 
 import (
 	"github.com/gorilla/context"
+	"github.com/sourcegraph/go-nnz/nnz"
 	"net/http"
 )
 
@@ -43,11 +44,12 @@ func setClientID(r *http.Request, id int64) {
 func getClient(r *http.Request) (c Client, err error) {
 	c.ClientID = GetClientID(r)
 	if CurrentUser != nil {
-		c.User.String, err = CurrentUser(r)
+		var u string
+		u, err = CurrentUser(r)
 		if err != nil {
 			return
 		}
-		c.User.Valid = (c.User.String != "")
+		c.User = nnz.String(u)
 	}
 	return
 }

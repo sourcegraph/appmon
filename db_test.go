@@ -2,7 +2,6 @@ package track
 
 import (
 	"database/sql"
-	"encoding/json"
 	"flag"
 	"reflect"
 	"sync"
@@ -69,7 +68,7 @@ func TestInsertView(t *testing.T) {
 	}
 	v := &View{
 		ViewID: ViewID{Win: w, Seq: 123},
-		Client: Client{User: NullString{"alice", true}},
+		Client: Client{User: "alice"},
 		State:  "my.state",
 		Params: map[string]interface{}{"k": "v"},
 		Date:   dbNow(),
@@ -154,36 +153,4 @@ func getOnlyOneCallStatus(t *testing.T) *CallStatus {
 // to the original.
 func dbNow() time.Time {
 	return time.Now().In(time.UTC).Round(time.Millisecond)
-}
-
-func TestNullString(t *testing.T) {
-	tests := []struct {
-		input NullString
-		want  []byte
-	}{
-		{input: NullString{"abc", true}, want: []byte(`"abc"`)},
-		{input: NullString{"", true}, want: []byte(`""`)},
-		{input: NullString{"", false}, want: []byte(`null`)},
-	}
-
-	for _, test := range tests {
-		got, err := json.Marshal(test.input)
-		if err != nil {
-			t.Errorf("%+v: Marshal: %s", test.input, err)
-			continue
-		}
-		if !reflect.DeepEqual(test.want, got) {
-			t.Errorf("%+v: want %q, got %q", test.input, test.want, got)
-		}
-
-		var input2 NullString
-		err = json.Unmarshal(got, &input2)
-		if err != nil {
-			t.Errorf("%+v: Unmarshal: %s", test.input, err)
-			continue
-		}
-		if !reflect.DeepEqual(test.input, input2) {
-			t.Errorf("%+v: want Marshal-then-Unmarshal to return original, got %+v", test.input, input2)
-		}
-	}
 }

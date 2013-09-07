@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	_ "github.com/lib/pq"
+	"github.com/sourcegraph/go-nnz/nnz"
 )
 
 // DBH is a database handle that is agnostic to whether it is a database
@@ -139,15 +140,15 @@ func QueryCalls(query string, args ...interface{}) (calls []*Call, err error) {
 	}
 	for rows.Next() {
 		c := new(Call)
-		var win, seq NullInt
+		var win, seq nnz.Int
 		err = rows.Scan(
 			&c.ID, &win, &seq, &c.User, &c.ClientID, &c.RequestURI, &c.Route, &c.RouteParams, &c.QueryParams, &c.Date,
 		)
 		if err != nil {
 			return
 		}
-		if win.Valid && seq.Valid {
-			c.View = &ViewID{Win: win.Int, Seq: seq.Int}
+		if win != 0 && seq != 0 {
+			c.View = &ViewID{Win: int(win), Seq: int(seq)}
 		}
 		calls = append(calls, c)
 	}
@@ -194,86 +195,4 @@ func (x *Params) Scan(v interface{}) error {
 		return json.Unmarshal(data, x)
 	}
 	return fmt.Errorf("%T.Scan failed: %v", x, v)
-}
-
-// NullInt represents an int that may be null.
-type NullInt struct {
-	Int   int
-	Valid bool // Valid is true if Int is not NULL
-}
-
-// Value implements the driver database/sql/driver.Valuer interface.
-func (x NullInt) Value() (driver.Value, error) {
-	if !x.Valid {
-		return nil, nil
-	}
-	return x.Int, nil
-}
-
-// Scan implements the database/sql/driver.Scanner interface.
-func (x *NullInt) Scan(v interface{}) error {
-	if v == nil {
-		x.Int, x.Valid = 0, false
-		return nil
-	}
-	i, ok := v.(int64)
-	x.Int = int(i)
-	x.Valid = true
-	if !ok {
-		return fmt.Errorf("%T.Scan failed: %v", x, v)
-	}
-	return nil
-}
-
-// NullString is sql.NullString with an implementation of the
-// encoding/json.Marshaler and encoding/json.Unmarshaler interfaces.
-type NullString sql.NullString
-
-// Scan implements the database/sql/driver.Scanner interface.
-func (ns *NullString) Scan(v interface{}) error {
-	if v == nil {
-		ns.String, ns.Valid = "", false
-		return nil
-	}
-	b, ok := v.([]byte)
-	if !ok {
-		return fmt.Errorf("%T.Scan failed: %v", ns, v)
-	}
-	ns.String = string(b)
-	ns.Valid = true
-	return nil
-}
-
-// Value implements the database/sql/driver.Valuer interface.
-func (ns NullString) Value() (driver.Value, error) {
-	if !ns.Valid {
-		return nil, nil
-	}
-	return ns.String, nil
-}
-
-// MarshalJSON implements the encoding/json.Marshaler interface.
-func (s NullString) MarshalJSON() ([]byte, error) {
-	if s.Valid {
-		return json.Marshal(s.String)
-	} else {
-		return json.Marshal(nil)
-	}
-}
-
-// UnmarshalJSON implements the encoding/json.Unmarshaler interface.
-func (s *NullString) UnmarshalJSON(data []byte) error {
-	var v interface{}
-	err := json.Unmarshal(data, &v)
-	if err != nil {
-		return err
-	}
-	if v, ok := v.(string); ok {
-		s.String = v
-		s.Valid = true
-	} else {
-		s.String = ""
-		s.Valid = false
-	}
-	return nil
 }
