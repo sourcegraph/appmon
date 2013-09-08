@@ -27,6 +27,9 @@ type Instance struct {
 	// User is the login of the current user, or "" if the user is not logged in.
 	User nnz.String
 
+	// App is the string identifier of the application (e.g., "web" or "ios").
+	App string
+
 	// URL is the original (i.e., first) URL requested by the client in this instance.
 	URL string
 

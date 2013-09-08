@@ -9,9 +9,9 @@ import (
 	"time"
 )
 
-// InstantiateApp wraps HTTP handlers that return the base HTML page for an
-// application.
-func InstantiateApp(h http.Handler) http.Handler {
+// InstantiateApp wraps HTTP handlers that return the base HTML page for the
+// application named by app (e.g., "web" or "chrome-extension").
+func InstantiateApp(app string, h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Set the ClientID cookie if it doesn't already exist.
 		clientID, err := GetClientID(r)
@@ -42,6 +42,7 @@ func InstantiateApp(h http.Handler) http.Handler {
 		// Create a new instance.
 		instance := &Instance{
 			ClientID:    clientID,
+			App:         app,
 			URL:         r.URL.String(),
 			ReferrerURL: r.Referer(),
 			ClientInfo:  ClientInfo{IPAddress: removePort(r.RemoteAddr), UserAgent: r.UserAgent()},

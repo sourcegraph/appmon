@@ -16,7 +16,7 @@ func TestInstantiateApp_PresentInCookie(t *testing.T) {
 
 	wantClientID := int64(123)
 	var called bool
-	h := InstantiateApp(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	h := InstantiateApp("", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
 		clientID, err := GetClientID(r)
 		if err != nil {

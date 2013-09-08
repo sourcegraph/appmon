@@ -47,6 +47,7 @@ CREATE TABLE "` + DBSchema + `".instance (
   id serial NOT NULL,
   "user" varchar(32) NULL,
   client_id bigint NOT NULL,
+  app varchar(32) NOT NULL,
   url varchar(255) NOT NULL,
   referrer_url varchar(255) NOT NULL,
   ip_addr varchar(15) NOT NULL,
@@ -95,10 +96,10 @@ func DropDBSchema() (err error) {
 // InsertInstance adds an instance to the database.
 func InsertInstance(o *Instance) (err error) {
 	return DB.QueryRow(`
-INSERT INTO "`+DBSchema+`".instance("user", client_id, url, referrer_url, ip_addr, user_agent, start)
-VALUES($1, $2, $3, $4, $5, $6, $7)
+INSERT INTO "`+DBSchema+`".instance("user", client_id, app, url, referrer_url, ip_addr, user_agent, start)
+VALUES($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING id
-`, o.User, o.ClientID, o.URL, o.ReferrerURL, o.IPAddress, o.UserAgent, o.Start).Scan(&o.ID)
+`, o.User, o.ClientID, o.App, o.URL, o.ReferrerURL, o.IPAddress, o.UserAgent, o.Start).Scan(&o.ID)
 }
 
 // QueryInstances returns all instances matching the SQL query conditions.
@@ -110,7 +111,7 @@ func QueryInstances(query string, args ...interface{}) (instances []*Instance, e
 	}
 	for rows.Next() {
 		o := new(Instance)
-		err = rows.Scan(&o.ID, &o.User, &o.ClientID, &o.URL, &o.ReferrerURL, &o.IPAddress, &o.UserAgent, &o.Start)
+		err = rows.Scan(&o.ID, &o.User, &o.ClientID, &o.App, &o.URL, &o.ReferrerURL, &o.IPAddress, &o.UserAgent, &o.Start)
 		if err != nil {
 			return
 		}

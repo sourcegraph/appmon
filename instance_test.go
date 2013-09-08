@@ -15,12 +15,13 @@ func TestInstantiateApp(t *testing.T) {
 	defer httpTearDown()
 
 	wantInstance := &Instance{
+		App:        "myapp",
 		URL:        "/abc",
 		ClientInfo: ClientInfo{IPAddress: "127.0.0.1"},
 	}
 
 	var called bool
-	h := InstantiateApp(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	h := InstantiateApp("myapp", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
 
 		var err error
