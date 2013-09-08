@@ -22,7 +22,7 @@ func MakeClientConfig(rt *mux.Router) (config *ClientConfig, err error) {
 		return
 	}
 	return &ClientConfig{
-		NewViewURL: newViewURL.String(),
+		NewViewURL: newViewURL.RequestURI(),
 	}, nil
 }
 
