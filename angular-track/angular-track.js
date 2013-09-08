@@ -10,7 +10,7 @@ angular.module('track', [])
 }])
 
 .run(['$rootScope', 'Track', 'TrackClientData', 'TrackCurrentView', function($rootScope, Track, TrackClientData, TrackCurrentView) {
-  $rootScope.$on('$stateChangeStart', function(ev, to, toParams) {
+  $rootScope.$on('$stateChangeSuccess', function(ev, to, toParams) {
     Track.view(to.name, toParams);
   });
   TrackCurrentView.Instance = TrackClientData.Instance;
