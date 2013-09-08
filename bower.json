@@ -11,7 +11,8 @@
   "ignore": [
     "**/.*",
     "node_modules",
-    "bower_components"
+    "bower_components",
+    "*.go"
   ],
   "dependencies": {
     "angular": "~1.2.0",
