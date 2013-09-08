@@ -44,49 +44,12 @@ func NewClientData(r *http.Request) (data *ClientData) {
 var CurrentUser func(r *http.Request) (user string, err error)
 
 const (
-	trackQueryCalls = "track:queryCalls"
-
-	trackGetInstance = "track:getInstance"
-
 	trackCreateView = "track:createView"
-	trackQueryViews = "track:queryViews"
 )
 
 func APIRouter(rt *mux.Router) *mux.Router {
-	instances := rt.PathPrefix("/instances").Subrouter()
-
-	instances.Path("/{instance}").Methods("GET").HandlerFunc(getInstance).Name(trackGetInstance)
-	instance := instances.PathPrefix("/{instance}").Subrouter()
-
-	instance.Path("/views").Methods("POST").HandlerFunc(createView).Name(trackCreateView)
-	instance.Path("/views").Methods("GET").HandlerFunc(queryViews).Name(trackQueryViews)
-
-	view := instance.PathPrefix("/views/{seq}").Subrouter()
-
-	view.Path("/calls").Methods("GET").HandlerFunc(queryCalls).Name(trackQueryCalls)
+	rt.Path("/instances/{instance}/views").Methods("POST").HandlerFunc(createView).Name(trackCreateView)
 	return rt
-}
-
-func getInstance(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	id, err := strconv.Atoi(vars["instance"])
-	if err != nil || id <= 0 {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	instances, err := QueryInstances("WHERE id = $1", id)
-	if err != nil {
-		log.Printf("QueryInstances failed: %s", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	if len(instances) == 1 {
-		json.NewEncoder(w).Encode(instances[0])
-	} else {
-		http.NotFound(w, r)
-	}
 }
 
 func createView(w http.ResponseWriter, r *http.Request) {
@@ -118,51 +81,4 @@ func createView(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-}
-
-func queryViews(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	instance, err := strconv.Atoi(vars["instance"])
-	if err != nil || instance <= 0 {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	views, err := QueryViews("WHERE instance = $1", instance)
-	if err != nil {
-		log.Printf("QueryViews: %s", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	if views == nil {
-		views = []*View{}
-	}
-	json.NewEncoder(w).Encode(views)
-}
-
-func queryCalls(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	instance, err := strconv.Atoi(vars["instance"])
-	if err != nil || instance <= 0 {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	seq, err := strconv.Atoi(vars["seq"])
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	calls, err := QueryCalls("WHERE instance = $1 AND view_seq = $2", instance, seq)
-	if err != nil {
-		log.Printf("QueryCalls: %s", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	if calls == nil {
-		calls = []*Call{}
-	}
-	json.NewEncoder(w).Encode(calls)
 }

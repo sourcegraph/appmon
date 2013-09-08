@@ -5,6 +5,7 @@ import (
 	"flag"
 	"github.com/gorilla/mux"
 	"github.com/sourcegraph/track"
+	"github.com/sourcegraph/track/panel"
 	"html/template"
 	"log"
 	"net/http"
@@ -46,7 +47,9 @@ func main() {
 	rt := mux.NewRouter()
 	rt.PathPrefix("/static/angular-track").Handler(http.StripPrefix("/static/angular-track", http.FileServer(http.Dir(assetPath("../angular-track")))))
 	rt.PathPrefix("/static").Handler(http.StripPrefix("/static", http.FileServer(http.Dir(assetPath("static")))))
-	track.APIRouter(rt.PathPrefix("/api/track").Subrouter())
+	t := rt.PathPrefix("/api/track").Subrouter()
+	track.APIRouter(t)
+	panel.Router(t)
 	rt.PathPrefix("/api/contacts/{id:[0-9]+}").Methods("GET").Handler(track.TrackAPICall(http.HandlerFunc(getContact))).Name("getContact")
 	rt.PathPrefix("/api/contacts").Methods("GET").Handler(track.TrackAPICall(http.HandlerFunc(queryContacts))).Name("queryContacts")
 	rt.Path("/{path:.*}").Handler(track.InstantiateApp("example", http.HandlerFunc(app)))
