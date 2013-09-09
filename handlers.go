@@ -15,13 +15,6 @@ const ViewIDHeader = "X-Track-View"
 // TrackAPICall wraps an API endpoint handler and records incoming API calls.
 func TrackAPICall(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		viewID, err := GetViewID(r)
-		if err != nil {
-			log.Printf("GetViewID failed: %s", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-
 		c := &Call{
 			URL:         r.URL.String(),
 			Route:       mux.CurrentRoute(r).GetName(),
@@ -29,9 +22,24 @@ func TrackAPICall(h http.Handler) http.Handler {
 			QueryParams: mapStringSliceOfStringAsParams(r.URL.Query()),
 			Date:        time.Now(),
 		}
+
+		// Try to get the current view info from the X-Track-View header.
+		viewID, err := GetViewID(r)
+		if err != nil {
+			log.Printf("GetViewID failed: %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 		if viewID != nil {
 			c.Instance = viewID.Instance
 			c.ViewSeq = nnz.Int(viewID.Seq)
+		}
+
+		// Otherwise, try to get the instance from the request context.
+		if c.Instance == 0 {
+			if i := GetInstance(r); i != 0 {
+				c.Instance = i
+			}
 		}
 
 		err = InsertCall(c)
