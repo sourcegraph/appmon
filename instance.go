@@ -39,7 +39,7 @@ func InstantiateApp(app string, h http.Handler) http.Handler {
 			http.SetCookie(w, (*http.Cookie)(c))
 		}
 
-		if GetInstance(r) == 0 {
+		if getInstance(r, false) == 0 {
 			// Create a new instance.
 			instance := &Instance{
 				ClientID:    clientID,
@@ -75,9 +75,13 @@ func InstantiateApp(app string, h http.Handler) http.Handler {
 }
 
 func GetInstance(r *http.Request) (id int) {
+	return getInstance(r, true)
+}
+
+func getInstance(r *http.Request, logIfNotPresent bool) (id int) {
 	if v, present := context.GetOk(r, instanceID); present {
 		id, _ = v.(int)
-	} else {
+	} else if logIfNotPresent {
 		log.Printf("warn: no instanceID set for request %q (is the app base handler wrapped with InstantiateApp and are clients sending an X-Track-View header?)", r.RequestURI)
 	}
 	return
