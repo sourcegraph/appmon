@@ -10,7 +10,7 @@ angular.module('track', [])
 }])
 
 .run(['$rootScope', 'Track', 'TrackClientData', 'TrackCurrentView', function($rootScope, Track, TrackClientData, TrackCurrentView) {
-  $rootScope.$on('$stateChangeSuccess', function(ev, to, toParams) {
+  $rootScope.$on('$stateChangeStart', function(ev, to, toParams) {
     Track.view(to.name, toParams);
   });
   TrackCurrentView.Instance = TrackClientData.Instance;
@@ -32,11 +32,13 @@ angular.module('track', [])
   return data;
 }])
 
-.factory('Track', ['$http', '$location', 'TrackClientConfig', 'TrackCurrentView', function($http, $location, cfg, currentView) {
+.factory('Track', ['$http', '$location', '$state', 'TrackClientConfig', 'TrackCurrentView', function($http, $location, $state, cfg, currentView) {
   return {
     view: function(stateName, stateParams) {
       currentView.Seq++;
-      currentView.RequestURI = $location.url();
+      // TODO(sqs): this only captures query parameters that are parameters of
+      // the state.
+      currentView.RequestURI = $state.href(stateName, stateParams);
       currentView.State = stateName;
       currentView.StateParams = stateParams;
       $http.post(cfg.NewViewURL.replace(':instance', currentView.Instance), currentView);
