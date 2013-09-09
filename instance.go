@@ -96,7 +96,7 @@ func setInstance(r *http.Request, id int) {
 func removePort(remoteAddr string) string {
 	colon := strings.LastIndex(remoteAddr, ":")
 	if colon == -1 {
-		colon = len(remoteAddr) - 1
+		return remoteAddr
 	}
 	return remoteAddr[:colon]
 }
