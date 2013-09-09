@@ -39,34 +39,36 @@ func InstantiateApp(app string, h http.Handler) http.Handler {
 			http.SetCookie(w, (*http.Cookie)(c))
 		}
 
-		// Create a new instance.
-		instance := &Instance{
-			ClientID:    clientID,
-			App:         app,
-			URL:         r.URL.String(),
-			ReferrerURL: r.Referer(),
-			ClientInfo:  ClientInfo{IPAddress: removePort(r.RemoteAddr), UserAgent: r.UserAgent()},
-			Start:       time.Now(),
-		}
+		if GetInstance(r) == 0 {
+			// Create a new instance.
+			instance := &Instance{
+				ClientID:    clientID,
+				App:         app,
+				URL:         r.URL.String(),
+				ReferrerURL: r.Referer(),
+				ClientInfo:  ClientInfo{IPAddress: removePort(r.RemoteAddr), UserAgent: r.UserAgent()},
+				Start:       time.Now(),
+			}
 
-		// Look up the current user, if any.
-		if CurrentUser != nil {
-			user, err := CurrentUser(r)
+			// Look up the current user, if any.
+			if CurrentUser != nil {
+				user, err := CurrentUser(r)
+				if err != nil {
+					log.Printf("CurrentUser failed: %s", err)
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				instance.User = nnz.String(user)
+			}
+
+			err = InsertInstance(instance)
 			if err != nil {
-				log.Printf("CurrentUser failed: %s", err)
+				log.Printf("InsertInstance failed: %s", err)
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
-			instance.User = nnz.String(user)
+			setInstance(r, instance.ID)
 		}
-
-		err = InsertInstance(instance)
-		if err != nil {
-			log.Printf("InsertInstance failed: %s", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		setInstance(r, instance.ID)
 
 		h.ServeHTTP(w, r)
 	})
