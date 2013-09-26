@@ -46,7 +46,7 @@ func InstantiateApp(app string, h http.Handler) http.Handler {
 				App:         app,
 				URL:         r.URL.String(),
 				ReferrerURL: r.Referer(),
-				ClientInfo:  ClientInfo{IPAddress: removePort(r.RemoteAddr), UserAgent: r.UserAgent()},
+				ClientInfo:  ClientInfo{IPAddress: removePort(ClientIPAddress(r)), UserAgent: r.UserAgent()},
 				Start:       time.Now(),
 			}
 
@@ -89,6 +89,14 @@ func getInstance(r *http.Request, logIfNotPresent bool) (id int) {
 
 func setInstance(r *http.Request, id int) {
 	context.Set(r, instanceID, id)
+}
+
+// ClientIPAddress returns the client IP address that should be used. By
+// default, it returns r.RemoteAddr. Library users can override this behavior by
+// assigning a new ClientIPAddress func. The port number, if present, is
+// stripped from the return value of ClientIPAddress.
+var ClientIPAddress = func(r *http.Request) string {
+	return r.RemoteAddr
 }
 
 // removePort removes the ":port" from "host:port" strings; e.g.,
