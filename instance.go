@@ -17,22 +17,20 @@ func InstantiateApp(app string, h http.Handler) http.Handler {
 		clientID, err := GetClientID(r)
 		if err != nil {
 			log.Printf("GetClientID failed: %s", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
+			deleteClientIDCookie(w)
+			goto handle
 		}
 		if clientID == 0 {
 			clientID, err = nextClientID()
 			if err != nil {
 				log.Printf("nextClientID failed: %s", err)
-				w.WriteHeader(http.StatusInternalServerError)
-				return
+				goto handle
 			}
 
 			c, err := newClientIDCookie(clientID)
 			if err != nil {
 				log.Printf("newClientIDCookie failed: %s", err)
-				w.WriteHeader(http.StatusInternalServerError)
-				return
+				goto handle
 			}
 
 			setClientID(r, clientID)
@@ -55,8 +53,7 @@ func InstantiateApp(app string, h http.Handler) http.Handler {
 				user, err := CurrentUser(r)
 				if err != nil {
 					log.Printf("CurrentUser failed: %s", err)
-					w.WriteHeader(http.StatusInternalServerError)
-					return
+					goto handle
 				}
 				instance.User = nnz.String(user)
 			}
@@ -64,12 +61,12 @@ func InstantiateApp(app string, h http.Handler) http.Handler {
 			err = InsertInstance(instance)
 			if err != nil {
 				log.Printf("InsertInstance failed: %s", err)
-				w.WriteHeader(http.StatusInternalServerError)
-				return
+				goto handle
 			}
 			setInstance(r, instance.ID)
 		}
 
+	handle:
 		h.ServeHTTP(w, r)
 	})
 }

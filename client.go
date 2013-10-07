@@ -66,6 +66,14 @@ func (c *clientIDCookie) decodeClientID() (clientID int64, err error) {
 	return strconv.ParseInt(clientIDStr, 36, 64)
 }
 
+func deleteClientIDCookie(w http.ResponseWriter) {
+	http.SetCookie(w, &http.Cookie{
+		Name:   clientIDCookieName,
+		Path:   "/",
+		MaxAge: -1,
+	})
+}
+
 // nextClientID returns the next client ID from the PostgreSQL sequence.
 func nextClientID() (clientID int64, err error) {
 	row := DB.QueryRow(`SELECT nextval('"` + DBSchema + `".client_id_sequence')`)
