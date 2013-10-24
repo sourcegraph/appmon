@@ -202,6 +202,29 @@ func QueryCallStatuses(query string, args ...interface{}) (statuses []*CallStatu
 	return
 }
 
+// QueryCallsWithStatus returns all calls (including status, if present)
+// matching the SQL query conditions.
+func QueryCallsWithStatus(query string, args ...interface{}) (calls []*CallWithStatus, err error) {
+	var rows *sql.Rows
+	rows, err = DB.Query(`SELECT call.*, call_status.* FROM "`+DBSchema+`".call LEFT JOIN "`+DBSchema+`".call_status ON call_id = id `+query, args...)
+	if err != nil {
+		return
+	}
+	for rows.Next() {
+		c := new(CallWithStatus)
+		err = rows.Scan(
+			&c.ID, &c.Instance, &c.ViewSeq, &c.URL, &c.Route,
+			&c.RouteParams, &c.QueryParams, &c.Date,
+			&c.CallID, &c.Duration, &c.BodyLength, &c.HTTPStatusCode, &c.Panicked,
+		)
+		if err != nil {
+			return
+		}
+		calls = append(calls, c)
+	}
+	return
+}
+
 // Value implements the database/sql/driver.Valuer interface.
 func (x Params) Value() (driver.Value, error) {
 	if x == nil {

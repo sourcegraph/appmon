@@ -50,6 +50,7 @@ func main() {
 	t := rt.PathPrefix("/api/track").Subrouter()
 	track.APIRouter(t)
 	panel.Router(t)
+	panel.UIRouter("/admin/", rt.PathPrefix("/admin").Subrouter())
 	rt.PathPrefix("/api/contacts/{id:[0-9]+}").Methods("GET").Handler(track.TrackAPICall(http.HandlerFunc(getContact))).Name("getContact")
 	rt.PathPrefix("/api/contacts").Methods("GET").Handler(track.TrackAPICall(http.HandlerFunc(queryContacts))).Name("queryContacts")
 	rt.Path("/{path:.*}").Handler(track.InstantiateApp("example", http.HandlerFunc(app)))

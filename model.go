@@ -122,5 +122,10 @@ type CallStatus struct {
 	Panicked bool
 }
 
+type CallWithStatus struct {
+	Call
+	CallStatus
+}
+
 // Params is a map of parameters for states and calls.
 type Params map[string]interface{}
