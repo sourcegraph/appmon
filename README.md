@@ -12,3 +12,13 @@ Track tracks user actions and API calls in Web applications that use
 [Go](http://golang.org) and [AngularJS](http://angularjs.org/) (with [Angular UI
 Router](https://github.com/angular-ui/ui-router)).
 
+
+Running tests
+-------------
+
+1. Create the test database schema. Set the environment vars `PGHOST`, `PGUSER`,
+   `PGDATABASE`, etc., so that running `psql` alone opens a DB prompt.
+1. Run `go test -test.initdb`
+
+After running the tests with `-test.initdb`, you can omit the flag on future
+runs. To drop the DB schema, run `go test -test.dropdb`.
