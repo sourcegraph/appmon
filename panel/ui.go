@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/gorilla/mux"
+	"github.com/sourcegraph/go-nnz/nnz"
 	"github.com/sourcegraph/track"
 	"html/template"
 	"math"
@@ -16,6 +17,7 @@ import (
 const (
 	trackUICalls = "track:ui:calls"
 	trackUIMain  = "track:ui:main"
+	trackUIUsers = "track:ui:users"
 	trackUIViews = "track:ui:views"
 )
 
@@ -26,10 +28,142 @@ func UIRouter(theBaseHref string, rt *mux.Router) *mux.Router {
 	baseHref = theBaseHref
 	rt.Path("/calls").Methods("GET").HandlerFunc(uiCalls).Name(trackUICalls)
 	rt.Path("/views").Methods("GET").HandlerFunc(uiViews).Name(trackUIViews)
+	rt.Path("/users").Methods("GET").HandlerFunc(uiUsers).Name(trackUIUsers)
 	rt.Path("/").Methods("GET").HandlerFunc(uiMain).Name(trackUIMain)
 
 	return rt
 }
+
+func uiUsers(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+
+	lastNHoursStr := q.Get("lastNHours")
+	var lastNHours int
+	if lastNHoursStr == "" {
+		lastNHours = 7
+	} else {
+		var err error
+		lastNHours, err = strconv.Atoi(lastNHoursStr)
+		if err != nil {
+			http.Error(w, "bad 'lastNHours' parameter: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+
+	users, err := getUsers(lastNHours)
+	if err != nil {
+		http.Error(w, "getUsers failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var userViews []*track.View
+	selectedUser := q.Get("user")
+	if selectedUser != "" {
+		userViews, err = track.QueryViews(`INNER JOIN "`+track.DBSchema+`".instance i ON i.id = view.instance WHERE i."user" = $1 AND (current_timestamp - view.date < ($2::int * interval '1 hour')) ORDER BY view.date DESC LIMIT 100`, selectedUser, lastNHours)
+		if err != nil {
+			http.Error(w, "QueryViews failed: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	tmpl(trackUIUsers, uiUsersHTML)(w, struct {
+		common
+		LastNHours   int
+		Sort         string
+		Users        []*user
+		SelectedUser string
+		Views        []*track.View
+	}{
+		common:       newCommon("Users"),
+		LastNHours:   lastNHours,
+		Users:        users,
+		SelectedUser: selectedUser,
+		Views:        userViews,
+	})
+}
+
+type user struct {
+	User  string
+	Views nnz.Int
+}
+
+func getUsers(lastNHours int) (users []*user, err error) {
+	var rows *sql.Rows
+	userSQL := `
+      SELECT * FROM (
+        SELECT i."user", COUNT(v.*) AS count
+        FROM "` + track.DBSchema + `".view v
+        INNER JOIN "` + track.DBSchema + `".instance i ON i.id = v.instance
+        WHERE i."user" IS NOT NULL AND current_timestamp - date < ($1::int * interval '1 hour')
+        GROUP BY i."user"
+      ) q ORDER BY count DESC
+`
+	rows, err = track.DB.Query(userSQL, lastNHours)
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		u := new(user)
+		err = rows.Scan(&u.User, &u.Views)
+		if err != nil {
+			return
+		}
+		users = append(users, u)
+	}
+	return
+}
+
+var uiUsersHTML = `
+<h1>Users</h1>
+<div class="row">
+  <div class="col-md-2">
+    <form action="users" method="get" class="form">
+      {{if .SelectedUser}}<input type="hidden" name="state" value="{{.SelectedUser}}">{{end}}
+      <div class="form-group">
+        <label for="lastNHours">Last # hours</label>
+        <input type="number" class="form-control" id="lastNHours" name="lastNHours" placeholder="#" value="{{.LastNHours}}">
+      </div>
+      <button type="submit" class="btn btn-primary">Update list</button>
+    </form>
+  </div>
+  <div class="col-md-3">
+    <div class="list-group">
+    {{$LastNHours := .LastNHours}}
+    {{$SelectedUser := .SelectedUser}}
+    {{range .Users}}
+      <a href="users?lastNHours={{$LastNHours}}&user={{.User}}" class="list-group-item {{if eq $SelectedUser .User}}active{{end}}">
+        {{.User}}
+        <span class="badge">{{.Views}}</span>
+      </a>
+    {{else}}
+      <li><div class="alert alert-error">No users to show.</div></li>
+    {{end}}
+    </div>
+  </div>
+  <div class="col-md-7">
+     {{if eq .SelectedUser ""}}
+       <div class="alert alert-warning">Select a user.</div>
+     {{else}}
+       <table class="table">
+         <thead><tr><th>Date</th><th>URL</th>
+         <tbody>
+           {{range .Views}}
+             <tr>
+               <td>
+                 {{.Date.Format "2006-01-02 15:04:05"}}<br>
+                 <span class="text-muted">{{timeAgo .Date}}</span>
+               </td>
+               <td style="word-wrap:break-word;max-width:200px;"><a href="{{.RequestURI}}" target="_blank">{{.RequestURI}}</a></td>
+             </tr>
+           {{else}}
+             <tr><td colspan="5" class="alert alert-warning">No views found for user {{$SelectedUser}}.</td></tr>
+           {{end}}
+         </tbody>
+       </table>
+     {{end}}
+  </div>
+</div>
+`
 
 func uiViews(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
