@@ -234,7 +234,7 @@ func getViewStates(lastNHours int) (viewStates []*viewState, err error) {
 	viewStateSQL := `
       SELECT * FROM (
         SELECT v.state, COUNT(v.*) AS count
-        FROM track.view v
+        FROM "` + track.DBSchema + `".view v
         WHERE current_timestamp - date < ($1::int * interval '1 hour')
         GROUP BY state
       ) q ORDER BY count DESC
@@ -396,8 +396,8 @@ func getCallRoutes(lastNHours int, failedOnly bool) (callRoutes []*callRoute, er
 	callRouteSQL := `
       SELECT * FROM (
         SELECT c.route, COUNT(c.*) AS count, ROUND(AVG(COALESCE(cs.duration, 0))::bigint, -6) AS avg_duration
-        FROM track.call c
-        LEFT JOIN track.call_status cs ON cs.call_id = c.id
+        FROM "` + track.DBSchema + `".call c
+        LEFT JOIN "` + track.DBSchema + `".call_status cs ON cs.call_id = c.id
         WHERE current_timestamp - date < ($1::int * interval '1 hour')
           AND ((NOT $2) OR (http_status_code < 200 OR http_status_code >= 400 OR panicked))
         GROUP BY route
