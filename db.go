@@ -206,7 +206,7 @@ func QueryCallStatuses(query string, args ...interface{}) (statuses []*CallStatu
 // matching the SQL query conditions.
 func QueryCallsWithStatus(query string, args ...interface{}) (calls []*CallWithStatus, err error) {
 	var rows *sql.Rows
-	rows, err = DB.Query(`SELECT call.*, call_status.* FROM "`+DBSchema+`".call LEFT JOIN "`+DBSchema+`".call_status ON call_id = id `+query, args...)
+	rows, err = DB.Query(`SELECT call.*, call_status.* FROM "`+DBSchema+`".call INNER JOIN "`+DBSchema+`".call_status ON call_id = id `+query, args...)
 	if err != nil {
 		return
 	}
