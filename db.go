@@ -59,7 +59,7 @@ CREATE TABLE "` + DBSchema + `".view (
   instance int NOT NULL,
   seq int NOT NULL,
   request_uri varchar(1000) NOT NULL,
-  state varchar(32) NOT NULL,
+  state varchar(64) NOT NULL,
   state_params bytea NOT NULL,
   date timestamp(3) NOT NULL,
   CONSTRAINT view_pkey PRIMARY KEY (instance, seq)
@@ -69,7 +69,7 @@ CREATE TABLE "` + DBSchema + `".call (
   instance int NOT NULL,
   view_seq int NULL,
   url varchar(1000) NOT NULL,
-  route varchar(32) NOT NULL,
+  route varchar(64) NOT NULL,
   route_params bytea NOT NULL,
   query_params bytea NOT NULL,
   date timestamp(3) NOT NULL,
