@@ -64,7 +64,7 @@ type CallStatus struct {
 	HTTPStatusCode int
 
 	// Err is the error message, if any.
-	Err string
+	Err nnz.String
 }
 
 // Params is a map of parameters for states and calls.
