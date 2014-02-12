@@ -1,13 +1,13 @@
 language: go
 
 go:
-  - 1.1
+  - 1.2
 
 before_script:
-  - psql -c 'create database track_test;' postgres
+  - psql -c 'create database appmon_test;' postgres
 
 env:
-  - PGDATABASE=track_test PGUSER=postgres
+  - PGDATABASE=appmon_test PGUSER=postgres
 
 script:
   - go test -test.initdb -test.dropdb -test.v
