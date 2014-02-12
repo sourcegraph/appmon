@@ -1,8 +1,7 @@
-package track
+package appmon
 
 type contextKey int
 
 const (
-	clientID contextKey = iota
-	instanceID
+	callID contextKey = iota
 )

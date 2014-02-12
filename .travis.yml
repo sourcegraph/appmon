@@ -10,4 +10,4 @@ env:
   - PGDATABASE=appmon_test PGUSER=postgres
 
 script:
-  - go test -test.initdb -test.dropdb -test.v
+  - go test -test.initschema -test.dropschema -test.v

@@ -4,65 +4,77 @@ import (
 	"encoding/json"
 	"flag"
 	"github.com/gorilla/mux"
-	"github.com/sourcegraph/track"
-	"github.com/sourcegraph/track/panel"
+	"github.com/sourcegraph/appmon"
+	"github.com/sourcegraph/appmon/panel"
+	"go/build"
 	"html/template"
 	"log"
+	"math/rand"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 var bind = flag.String("http", ":8888", "HTTP bind address")
-var dir = flag.String("dir", "example", "path to github.com/sourcegraph/track/example dir")
-var dropDB = flag.Bool("dropdb", false, "drop the database before initializing it")
-var initDB = flag.Bool("initdb", false, "initialize the database before running")
+var baseURLStr = flag.String("url", "http://localhost:8888", "base URL of this server")
+var dir = flag.String("dir", filepath.Join(defaultBase("github.com/sourcegraph/appmon"), "example"), "path to github.com/sourcegraph/appmon/example dir")
+var dropSchema = flag.Bool("dropdb", false, "drop the appmon schema before initializing it")
+var initSchema = flag.Bool("initdb", false, "initialize the appmon schema before running")
 
-var authUser = flag.String("user", "alice", "consider all HTTP requests as authenticated as this user")
+var authUID = flag.Int("uid", 0, "consider all HTTP requests as authenticated as this UID (if non-zero)")
 
-var clientConfig *track.ClientConfig
+var rt *mux.Router
+var baseURL *url.URL
+
+const (
+	queryContactsRoute = "query-contacts"
+	getContactRoute    = "get-contact"
+)
 
 func main() {
 	flag.Parse()
 
-	err := track.OpenDB()
+	var err error
+	baseURL, err = url.Parse(*baseURLStr)
 	if err != nil {
-		log.Fatalf("track.OpenDB: %s", err)
+		log.Fatal(err)
 	}
 
-	if *dropDB {
-		err = track.DropDBSchema()
+	err = appmon.OpenDB()
+	if err != nil {
+		log.Fatalf("appmon.OpenDB: %s", err)
+	}
+
+	if *dropSchema {
+		err = appmon.DropDBSchema()
 		if err != nil {
-			log.Fatalf("DropDB: %s", err)
+			log.Fatalf("DropDBSchema: %s", err)
 		}
 	}
-	if *initDB {
-		err = track.InitDB()
+	if *initSchema {
+		err = appmon.InitDBSchema()
 		if err != nil {
-			log.Fatalf("InitDB: %s", err)
+			log.Fatalf("InitDBSchema: %s", err)
 		}
 	}
 
-	rt := mux.NewRouter()
-	rt.PathPrefix("/static/angular-track").Handler(http.StripPrefix("/static/angular-track", http.FileServer(http.Dir(assetPath("../angular-track")))))
-	rt.PathPrefix("/static").Handler(http.StripPrefix("/static", http.FileServer(http.Dir(assetPath("static")))))
-	t := rt.PathPrefix("/api/track").Subrouter()
-	track.APIRouter(t)
+	rt = mux.NewRouter()
+	t := rt.PathPrefix("/api/appmon").Subrouter()
 	panel.Router(t)
 	panel.UIRouter("/admin/", rt.PathPrefix("/admin").Subrouter())
-	rt.PathPrefix("/api/contacts/{id:[0-9]+}").Methods("GET").Handler(track.TrackAPICall(http.HandlerFunc(getContact))).Name("getContact")
-	rt.PathPrefix("/api/contacts").Methods("GET").Handler(track.TrackAPICall(http.HandlerFunc(queryContacts))).Name("queryContacts")
-	rt.Path("/{path:.*}").Handler(track.InstantiateApp("example", http.HandlerFunc(app)))
+	rt.PathPrefix("/api/contacts/{id:[0-9]+}").Methods("GET").Handler(appmon.TrackAPICall("api", http.HandlerFunc(getContact))).Name(getContactRoute)
+	rt.PathPrefix("/api/contacts").Methods("GET").Handler(appmon.TrackAPICall("api", http.HandlerFunc(queryContacts))).Name(queryContactsRoute)
+	rt.Path("/contacts/{id:[0-9]+}").Handler(appmon.TrackAPICall("example", http.HandlerFunc(showContact)))
+	rt.Path("/").Handler(appmon.TrackAPICall("example", http.HandlerFunc(home)))
 	http.Handle("/", rt)
 
-	clientConfig, err = track.MakeClientConfig(rt)
-	if err != nil {
-		log.Fatalf("track.MakeClientConfig: %s", err)
-	}
-
-	track.CurrentUser = func(r *http.Request) (user string, err error) {
-		return *authUser, nil
+	if *authUID != 0 {
+		appmon.CurrentUser = func(r *http.Request) int {
+			return *authUID
+		}
 	}
 
 	log.Printf("Listening on %s", *bind)
@@ -77,14 +89,76 @@ func assetPath(path string) string {
 	return p
 }
 
-func app(w http.ResponseWriter, r *http.Request) {
-	tmpl := template.Must(template.ParseFiles(assetPath("app.tpl.html")))
-	err := tmpl.Execute(w, struct {
-		Config *track.ClientConfig
-		Data   *track.ClientData
+func home(w http.ResponseWriter, r *http.Request) {
+	tmpl := template.Must(template.ParseFiles(assetPath("home.html")))
+
+	url, err := rt.GetRoute(queryContactsRoute).URL()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	req, _ := http.NewRequest("GET", baseURL.ResolveReference(url).String(), nil)
+	appmon.AddParentCallIDHeader(r, req.Header)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer resp.Body.Close()
+
+	var contacts []*contact
+	err = json.NewDecoder(resp.Body).Decode(&contacts)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	callID, _ := appmon.GetCallID(r)
+	err = tmpl.Execute(w, struct {
+		Contacts []*contact
+		CallID   int64
 	}{
-		Config: clientConfig,
-		Data:   track.NewClientData(r),
+		Contacts: contacts,
+		CallID:   callID,
+	})
+	if err != nil {
+		log.Printf("Template execution failed: %s", err)
+	}
+}
+
+func showContact(w http.ResponseWriter, r *http.Request) {
+	tmpl := template.Must(template.ParseFiles(assetPath("contact.html")))
+
+	url, err := rt.GetRoute(getContactRoute).URL("id", mux.Vars(r)["id"])
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	req, _ := http.NewRequest("GET", baseURL.ResolveReference(url).String(), nil)
+	appmon.AddParentCallIDHeader(r, req.Header)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer resp.Body.Close()
+
+	var contact_ *contact
+	err = json.NewDecoder(resp.Body).Decode(&contact_)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	callID, _ := appmon.GetCallID(r)
+	err = tmpl.Execute(w, struct {
+		Contact *contact
+		CallID  int64
+	}{
+		Contact: contact_,
+		CallID:  callID,
 	})
 	if err != nil {
 		log.Printf("Template execution failed: %s", err)
@@ -107,10 +181,13 @@ var contacts = []contact{
 }
 
 func queryContacts(w http.ResponseWriter, r *http.Request) {
+	time.Sleep(time.Duration(rand.Intn(500)) * time.Millisecond)
 	json.NewEncoder(w).Encode(contacts)
 }
 
 func getContact(w http.ResponseWriter, r *http.Request) {
+	time.Sleep(time.Duration(rand.Intn(900)) * time.Millisecond)
+
 	vars := mux.Vars(r)
 	id, _ := strconv.Atoi(vars["id"])
 	if id <= 0 || id > len(contacts) {
@@ -126,4 +203,12 @@ func getContact(w http.ResponseWriter, r *http.Request) {
 		panic("contact contains PANICS")
 	}
 	json.NewEncoder(w).Encode(contact)
+}
+
+func defaultBase(path string) string {
+	p, err := build.Default.Import(path, "", build.FindOnly)
+	if err != nil {
+		return "."
+	}
+	return p.Dir
 }

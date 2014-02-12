@@ -1,4 +1,4 @@
-package track
+package appmon
 
 import (
 	"net/http"
@@ -32,14 +32,14 @@ func httpTearDown() {
 	server.Close()
 }
 
-func httpGet(t *testing.T, url string, headerKey, headerVal string) (res *http.Response) {
+func httpGet(t *testing.T, url string, callID int64) (res *http.Response) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		t.Fatal("http.NewRequest", err)
 	}
 
-	if headerKey != "" {
-		req.Header.Add(headerKey, headerVal)
+	if callID != 0 {
+		addParentCallIDHeader(callID, req.Header)
 	}
 
 	res, err = http.DefaultClient.Do(req)

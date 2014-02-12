@@ -1,11 +1,14 @@
-package track
+package appmon
 
 import (
+	"bytes"
 	"database/sql"
 	"database/sql/driver"
 	"encoding/json"
+	"errors"
 	"fmt"
 	_ "github.com/lib/pq"
+	"time"
 )
 
 // DBH is a database handle that is agnostic to whether it is a database
@@ -26,7 +29,7 @@ var DB DBH
 // DBSchema is the name of the PostgreSQL database schema used for all SQL
 // operations. It is double-quoted in SQL statements sent to the database but
 // not escaped.
-var DBSchema = "track"
+var DBSchema = "appmon"
 
 // OpenDB connects to the database using connection parameters from the PG*
 // environment variables. The database connection is stored in the global
@@ -37,51 +40,36 @@ func OpenDB() (err error) {
 	return
 }
 
-// InitDB creates the database schema and tables.
-func InitDB() (err error) {
+// InitDBSchema creates the database schema and tables.
+func InitDBSchema() (err error) {
 	_, err = DB.Exec(`
 CREATE SCHEMA "` + DBSchema + `";
-CREATE SEQUENCE "` + DBSchema + `".client_id_sequence;
-CREATE SEQUENCE "` + DBSchema + `".instance_sequence;
-CREATE TABLE "` + DBSchema + `".instance (
-  id serial NOT NULL,
-  "user" varchar(32) NULL,
-  client_id bigint NOT NULL,
-  app varchar(32) NOT NULL,
-  url varchar(1000) NOT NULL,
-  referrer_url varchar(1000) NOT NULL,
-  ip_addr varchar(15) NOT NULL,
-  user_agent varchar(1000) NOT NULL,
-  start timestamp(3) NOT NULL,
-  CONSTRAINT instance_pkey PRIMARY KEY (id)
-);
-CREATE TABLE "` + DBSchema + `".view (
-  instance int NOT NULL,
-  seq int NOT NULL,
-  request_uri varchar(1000) NOT NULL,
-  state varchar(64) NOT NULL,
-  state_params bytea NOT NULL,
-  date timestamp(3) NOT NULL,
-  CONSTRAINT view_pkey PRIMARY KEY (instance, seq)
-);
 CREATE TABLE "` + DBSchema + `".call (
-  id serial NOT NULL,
-  instance int NOT NULL,
-  view_seq int NULL,
+  id bigserial NOT NULL,
+  parent_call_id bigint,
+
+  app varchar(24) NOT NULL,
+  host varchar(32) NOT NULL,
+
+  remote_addr varchar(24) NOT NULL,
+  user_agent varchar(500) NOT NULL,
+  uid int NULL,
+
   url varchar(1000) NOT NULL,
-  route varchar(64) NOT NULL,
-  route_params bytea NOT NULL,
-  query_params bytea NOT NULL,
-  date timestamp(3) NOT NULL,
+  http_method varchar(12) NOT NULL,
+  route varchar(64) NULL,
+  route_params varchar(1000) NOT NULL,
+  query_params varchar(1000) NOT NULL,
+
+  start timestamp(3) NOT NULL,
+
+  -- call status fields (filled in post-request)
+  "end" timestamp(3),
+  body_length int,
+  http_status_code int,
+  err text,
+
   CONSTRAINT call_pkey PRIMARY KEY (id)
-);
-CREATE TABLE "` + DBSchema + `".call_status (
-  call_id bigint NOT NULL,
-  duration bigint NOT NULL,
-  body_length int NOT NULL,
-  http_status_code int NOT NULL,
-  panicked boolean NOT NULL,
-  CONSTRAINT call_status_pkey PRIMARY KEY (call_id)
 );
 `)
 	return
@@ -93,66 +81,12 @@ func DropDBSchema() (err error) {
 	return
 }
 
-// InsertInstance adds an instance to the database.
-func InsertInstance(o *Instance) (err error) {
+// insertCall adds a Call to the database and writes its serial ID to c.ID.
+func insertCall(c *Call) (err error) {
 	return DB.QueryRow(`
-INSERT INTO "`+DBSchema+`".instance("user", client_id, app, url, referrer_url, ip_addr, user_agent, start)
-VALUES($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id
-`, o.User, o.ClientID, o.App, o.URL, o.ReferrerURL, o.IPAddress, o.UserAgent, o.Start).Scan(&o.ID)
-}
-
-// QueryInstances returns all instances matching the SQL query conditions.
-func QueryInstances(query string, args ...interface{}) (instances []*Instance, err error) {
-	var rows *sql.Rows
-	rows, err = DB.Query(`SELECT instance.* FROM "`+DBSchema+`".instance `+query, args...)
-	if err != nil {
-		return
-	}
-	for rows.Next() {
-		o := new(Instance)
-		err = rows.Scan(&o.ID, &o.User, &o.ClientID, &o.App, &o.URL, &o.ReferrerURL, &o.IPAddress, &o.UserAgent, &o.Start)
-		if err != nil {
-			return
-		}
-		instances = append(instances, o)
-	}
-	return
-}
-
-// InsertView adds a view to the database.
-func InsertView(v *View) (err error) {
-	_, err = DB.Exec(`
-INSERT INTO "`+DBSchema+`".view(instance, seq, request_uri, state, state_params, date)
-VALUES($1, $2, $3, $4, $5, $6)
-`, v.Instance, v.Seq, v.RequestURI, v.State, v.StateParams, v.Date)
-	return
-}
-
-// QueryViews returns all views matching the SQL query conditions.
-func QueryViews(query string, args ...interface{}) (views []*View, err error) {
-	var rows *sql.Rows
-	rows, err = DB.Query(`SELECT view.* FROM "`+DBSchema+`".view `+query, args...)
-	if err != nil {
-		return
-	}
-	for rows.Next() {
-		v := new(View)
-		err = rows.Scan(&v.Instance, &v.Seq, &v.RequestURI, &v.State, &v.StateParams, &v.Date)
-		if err != nil {
-			return
-		}
-		views = append(views, v)
-	}
-	return
-}
-
-// InsertCall adds a Call to the database.
-func InsertCall(c *Call) (err error) {
-	return DB.QueryRow(`
-INSERT INTO "`+DBSchema+`".call(instance, view_seq, url, route, route_params, query_params, date)
-VALUES($1, $2, $3, $4, $5, $6, $7) RETURNING id
-`, c.Instance, c.ViewSeq, c.URL, c.Route, c.RouteParams, c.QueryParams, c.Date).Scan(&c.ID)
+INSERT INTO "`+DBSchema+`".call(parent_call_id, app, host, remote_addr, user_agent, uid, url, http_method, route, route_params, query_params, "start", "end", body_length, http_status_code, err)
+VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING id
+`, c.ParentCallID, c.App, c.Host, c.RemoteAddr, c.UserAgent, c.UID, c.URL, c.HTTPMethod, c.Route, c.RouteParams, c.QueryParams, c.Start, c.End, c.BodyLength, c.HTTPStatusCode, c.Err).Scan(&c.ID)
 }
 
 // QueryCalls returns all calls matching the SQL query conditions.
@@ -165,8 +99,8 @@ func QueryCalls(query string, args ...interface{}) (calls []*Call, err error) {
 	for rows.Next() {
 		c := new(Call)
 		err = rows.Scan(
-			&c.ID, &c.Instance, &c.ViewSeq, &c.URL, &c.Route,
-			&c.RouteParams, &c.QueryParams, &c.Date,
+			&c.ID, &c.ParentCallID, &c.App, &c.Host, &c.RemoteAddr, &c.UserAgent, &c.UID, &c.URL, &c.HTTPMethod,
+			&c.Route, &c.RouteParams, &c.QueryParams, &c.Start, &c.End, &c.BodyLength, &c.HTTPStatusCode, &c.Err,
 		)
 		if err != nil {
 			return
@@ -176,52 +110,11 @@ func QueryCalls(query string, args ...interface{}) (calls []*Call, err error) {
 	return
 }
 
-func InsertCallStatus(s *CallStatus) (err error) {
+func setCallStatus(callID int64, s *CallStatus) (err error) {
 	_, err = DB.Exec(`
-INSERT INTO "`+DBSchema+`".call_status(call_id, duration, body_length, http_status_code, panicked)
-VALUES($1, $2, $3, $4, $5)
-`, s.CallID, s.Duration, s.BodyLength, s.HTTPStatusCode, s.Panicked)
-	return
-}
-
-// QueryCallStatuses returns all call statuses matching the SQL query conditions.
-func QueryCallStatuses(query string, args ...interface{}) (statuses []*CallStatus, err error) {
-	var rows *sql.Rows
-	rows, err = DB.Query(`SELECT call_status.* FROM "`+DBSchema+`".call_status `+query, args...)
-	if err != nil {
-		return
-	}
-	for rows.Next() {
-		s := new(CallStatus)
-		err = rows.Scan(&s.CallID, &s.Duration, &s.BodyLength, &s.HTTPStatusCode, &s.Panicked)
-		if err != nil {
-			return
-		}
-		statuses = append(statuses, s)
-	}
-	return
-}
-
-// QueryCallsWithStatus returns all calls (including status, if present)
-// matching the SQL query conditions.
-func QueryCallsWithStatus(query string, args ...interface{}) (calls []*CallWithStatus, err error) {
-	var rows *sql.Rows
-	rows, err = DB.Query(`SELECT call.*, call_status.* FROM "`+DBSchema+`".call INNER JOIN "`+DBSchema+`".call_status ON call_id = id `+query, args...)
-	if err != nil {
-		return
-	}
-	for rows.Next() {
-		c := new(CallWithStatus)
-		err = rows.Scan(
-			&c.ID, &c.Instance, &c.ViewSeq, &c.URL, &c.Route,
-			&c.RouteParams, &c.QueryParams, &c.Date,
-			&c.CallID, &c.Duration, &c.BodyLength, &c.HTTPStatusCode, &c.Panicked,
-		)
-		if err != nil {
-			return
-		}
-		calls = append(calls, c)
-	}
+UPDATE "`+DBSchema+`".call SET "end" = $1, body_length = $2, http_status_code = $3, err = $4
+WHERE id = $5
+`, s.End, s.BodyLength, s.HTTPStatusCode, s.Err, callID)
 	return
 }
 
@@ -239,4 +132,53 @@ func (x *Params) Scan(v interface{}) error {
 		return json.Unmarshal(data, x)
 	}
 	return fmt.Errorf("%T.Scan failed: %v", x, v)
+}
+
+type NullTime struct {
+	Time  time.Time
+	Valid bool // Valid is true if Time is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (nt *NullTime) Scan(value interface{}) error {
+	nt.Time, nt.Valid = value.(time.Time)
+	return nil
+}
+
+// Value implements the driver Valuer interface.
+func (nt NullTime) Value() (driver.Value, error) {
+	if !nt.Valid {
+		return nil, nil
+	}
+	return nt.Time, nil
+}
+
+// MarshalJSON implements the json.Marshaler interface.
+func (nt NullTime) MarshalJSON() ([]byte, error) {
+	if nt.Valid {
+		return json.Marshal(nt.Time)
+	}
+	return []byte("null"), nil
+}
+
+// UnmarshalJSON implements the json.Unmarshaler interface.
+func (nt *NullTime) UnmarshalJSON(data []byte) (err error) {
+	if nt == nil {
+		return errors.New("UnmarshalJSON on nil *NullTime pointer")
+	}
+	if bytes.Compare(data, []byte("null")) == 0 {
+		nt.Valid = false
+	} else {
+		nt.Valid = true
+		err = json.Unmarshal(data, &nt.Time)
+	}
+	return
+}
+
+func now() NullTime {
+	return NullTime{Time: time.Now().In(time.UTC), Valid: true}
+}
+
+func roundTime(t time.Time) time.Time {
+	return t.In(time.UTC).Round(time.Millisecond)
 }

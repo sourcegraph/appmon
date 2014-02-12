@@ -1,4 +1,4 @@
-package track
+package appmon
 
 import (
 	"github.com/gorilla/mux"
@@ -8,66 +8,50 @@ import (
 	"time"
 )
 
-// ViewIDHeader is the HTTP request header ("X-Track-View") that contains the view
-// instance and sequence number.
-const ViewIDHeader = "X-Track-View"
+// CurrentUser, if set, is called to determine the currently authenticated user
+// for the current request. The returned user ID is stored in the Call record if
+// nonzero.
+var CurrentUser func(r *http.Request) int
 
 // TrackAPICall wraps an API endpoint handler and records incoming API calls.
-func TrackAPICall(h http.Handler) http.Handler {
+func TrackAPICall(app string, h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		c := &Call{
+			App:         app,
+			Host:        hostname,
+			RemoteAddr:  r.RemoteAddr,
+			UserAgent:   r.UserAgent(),
 			URL:         r.URL.String(),
+			HTTPMethod:  r.Method,
 			Route:       mux.CurrentRoute(r).GetName(),
 			RouteParams: mapStringStringAsParams(mux.Vars(r)),
 			QueryParams: mapStringSliceOfStringAsParams(r.URL.Query()),
-			Date:        time.Now(),
+			Start:       time.Now().In(time.UTC),
+		}
+		if parentCallID, ok := GetParentCallID(r); ok {
+			c.ParentCallID = nnz.Int64(parentCallID)
+		}
+		if CurrentUser != nil {
+			c.UID = nnz.Int(CurrentUser(r))
 		}
 
-		// Try to get the current view info from the X-Track-View header.
-		viewID, err := GetViewID(r)
+		err := insertCall(c)
 		if err != nil {
-			log.Printf("GetViewID failed: %s", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
+			log.Printf("insertCall failed: %s", err)
 		}
-		if viewID != nil {
-			c.Instance = viewID.Instance
-			c.ViewSeq = nnz.Int(viewID.Seq)
-		}
+		setCallID(r, c.ID)
 
-		// Otherwise, try to get the instance from the request context.
-		if c.Instance == 0 {
-			if i := GetInstance(r); i != 0 {
-				c.Instance = i
-			}
-		}
-
-		err = InsertCall(c)
-		if err != nil {
-			log.Printf("InsertCall failed: %s", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-
-		status := CallStatus{
-			CallID:   c.ID,
-			Panicked: true, // assume the worst, set false if no panic
-		}
-		start := time.Now()
 		rw := newRecorder(w)
-		defer func() {
-			status.Duration = time.Since(start).Nanoseconds()
-			status.BodyLength = rw.BodyLength
-			status.HTTPStatusCode = rw.Code
-			err := InsertCallStatus(&status)
-			if err != nil {
-				log.Printf("warn: UpdateCallStatus failed (ID=%d): %s", c.ID, err)
-			}
-		}()
-
 		h.ServeHTTP(rw, r)
 
-		status.Panicked = false
+		err = setCallStatus(c.ID, &CallStatus{
+			End:            now(),
+			BodyLength:     rw.BodyLength,
+			HTTPStatusCode: rw.Code,
+		})
+		if err != nil {
+			log.Printf("setCallStatus failed for call ID %d: %s", c.ID, err)
+		}
 	})
 }
 
