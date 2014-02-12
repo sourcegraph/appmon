@@ -112,7 +112,7 @@ func getCallRoutes(lastNHours int, failedOnly bool) (callRoutes []*callRoute, er
 	var rows *sql.Rows
 	callRouteSQL := `
       SELECT * FROM (
-        SELECT c.route, COUNT(c.*) AS count, ROUND(AVG(extract(epoch from (c."end" - c.start))*1000000)) AS avg_duration
+        SELECT c.route, COUNT(c.*) AS count, ROUND(AVG(extract(epoch from (c."end" - c.start))*1000000))::bigint AS avg_duration
         FROM "` + appmon.DBSchema + `".call c
         WHERE current_timestamp - c.start < ($1::int * interval '1 hour')
           AND c."end" IS NOT NULL
