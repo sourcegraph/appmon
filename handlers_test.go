@@ -56,7 +56,8 @@ func TestTrackView(t *testing.T) {
 		if _, ok := GetParentCallID(r); ok {
 			t.Error("has ParentCallID")
 		}
-		if callID, ok := GetCallID(r); !ok {
+		callID, ok := GetCallID(r)
+		if !ok {
 			t.Error("no CallID")
 		} else {
 			// update test expectation
@@ -74,8 +75,8 @@ func TestTrackView(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		AddParentCallIDHeader(r, req2.Header)
-		resp2, err := http.DefaultClient.Do(req2)
+		tracingClient := &http.Client{Transport: &TracingTransport{ParentCallID: callID}}
+		resp2, err := tracingClient.Do(req2)
 		if err != nil {
 			t.Fatal(err)
 		}
