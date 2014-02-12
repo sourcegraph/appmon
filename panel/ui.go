@@ -185,10 +185,11 @@ var uiCallsHTML = `
        <div class="alert alert-warning">Select a route.</div>
      {{else}}
        <table class="table">
-         <thead><tr><th>Start</th><th>URL</th><th>User</th><th>Duration</th><th>Bytes</th><th>Status</th></thead>
+         <thead><tr><th>ID</th><th>Start</th><th>URL</th><th>User</th><th>Duration</th><th>Bytes</th><th>Status</th></thead>
          <tbody>
            {{range .Calls}}
              <tr class="{{if isHTTPError .HTTPStatusCode}}danger{{end}}">
+               <td>{{.ID}} {{if .ParentCallID}}<br><span class="text-muted" title="ParentCallID">{{.ParentCallID}}</span>{{end}}</td>
                <td>
                  {{.Start.Format "2006-01-02 15:04:05"}}<br>
                  <span class="text-muted">{{timeAgo .Start}}</span>
