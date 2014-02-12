@@ -75,8 +75,9 @@ func uiCalls(w http.ResponseWriter, r *http.Request) {
 
 	var calls []*appmon.Call
 	selectedRoute := q.Get("route")
-	if selectedRoute != "" {
-		calls, err = appmon.QueryCalls(`WHERE route = $1 AND (current_timestamp - "start" < ($2::int * interval '1 hour')) AND ((NOT $3) OR (http_status_code < 200 OR http_status_code >= 400)) ORDER BY `+sorts[sort]+` DESC LIMIT 100`, selectedRoute, lastNHours, failedOnly)
+	selectedApp := q.Get("app")
+	if selectedRoute != "" && selectedApp != "" {
+		calls, err = appmon.QueryCalls(`WHERE app = $1 AND route = $2 AND (current_timestamp - "start" < ($3::int * interval '1 hour')) AND ((NOT $4) OR (http_status_code < 200 OR http_status_code >= 400)) ORDER BY `+sorts[sort]+` DESC LIMIT 100`, selectedApp, selectedRoute, lastNHours, failedOnly)
 		if err != nil {
 			http.Error(w, "QueryCalls failed: "+err.Error(), http.StatusInternalServerError)
 			return
@@ -89,6 +90,7 @@ func uiCalls(w http.ResponseWriter, r *http.Request) {
 		FailedOnly    bool
 		Sort          string
 		CallRoutes    []*callRoute
+		SelectedApp   string
 		SelectedRoute string
 		Calls         []*appmon.Call
 	}{
@@ -97,12 +99,14 @@ func uiCalls(w http.ResponseWriter, r *http.Request) {
 		FailedOnly:    failedOnly,
 		Sort:          sort,
 		CallRoutes:    callRoutes,
+		SelectedApp:   selectedApp,
 		SelectedRoute: selectedRoute,
 		Calls:         calls,
 	})
 }
 
 type callRoute struct {
+	App         string
 	Route       string
 	Count       int
 	AvgDuration int64
@@ -112,12 +116,12 @@ func getCallRoutes(lastNHours int, failedOnly bool) (callRoutes []*callRoute, er
 	var rows *sql.Rows
 	callRouteSQL := `
       SELECT * FROM (
-        SELECT c.route, COUNT(c.*) AS count, ROUND(AVG(extract(epoch from (c."end" - c.start))*1000000))::bigint AS avg_duration
+        SELECT c.app, c.route, COUNT(c.*) AS count, ROUND(AVG(extract(epoch from (c."end" - c.start))*1000000))::bigint AS avg_duration
         FROM "` + appmon.DBSchema + `".call c
         WHERE current_timestamp - c.start < ($1::int * interval '1 hour')
           AND c."end" IS NOT NULL
           AND ((NOT $2) OR (http_status_code < 200 OR http_status_code >= 400))
-        GROUP BY route
+        GROUP BY app, route
       ) q ORDER BY count DESC
 `
 	rows, err = appmon.DB.Query(callRouteSQL, lastNHours, failedOnly)
@@ -126,7 +130,7 @@ func getCallRoutes(lastNHours int, failedOnly bool) (callRoutes []*callRoute, er
 	}
 	for rows.Next() {
 		cr := new(callRoute)
-		err = rows.Scan(&cr.Route, &cr.Count, &cr.AvgDuration)
+		err = rows.Scan(&cr.App, &cr.Route, &cr.Count, &cr.AvgDuration)
 		if err != nil {
 			return
 		}
@@ -141,6 +145,7 @@ var uiCallsHTML = `
   <div class="col-md-2">
     <form action="calls" method="get" class="form">
       {{if .SelectedRoute}}<input type="hidden" name="route" value="{{.SelectedRoute}}">{{end}}
+      {{if .SelectedApp}}<input type="hidden" name="app" value="{{.SelectedApp}}">{{end}}
       <div class="form-group">
         <label for="lastNHours">Last # hours</label>
         <input type="number" class="form-control" id="lastNHours" name="lastNHours" placeholder="#" value="{{.LastNHours}}">
@@ -169,8 +174,10 @@ var uiCallsHTML = `
     {{$FailedOnly := .FailedOnly}}
     {{$Sort := .Sort}}
     {{$SelectedRoute := .SelectedRoute}}
+    {{$SelectedApp := .SelectedApp}}
     {{range .CallRoutes}}
-      <a href="calls?sort={{$Sort}}&failedOnly={{$FailedOnly}}&lastNHours={{$LastNHours}}&route={{.Route}}" class="list-group-item {{if eq $SelectedRoute .Route}}active{{end}}">
+      <a href="calls?sort={{$Sort}}&failedOnly={{$FailedOnly}}&lastNHours={{$LastNHours}}&route={{.Route}}&app={{.App}}" class="list-group-item {{if and (eq $SelectedRoute .Route) (eq $SelectedApp .App)}}active{{end}}">
+        <strong>{{if .App}}{{.App}}{{else}}(no app){{end}}</strong>
         {{if .Route}}{{.Route}}{{else}}(unnamed){{end}}
         <span class="badge">{{.Count}}</span>
         <span class="badge"><span class="glyphicon glyphicon-time" style="font-size:0.85em"></span> {{duration .AvgDuration}}</span>
