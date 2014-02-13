@@ -3,14 +3,16 @@ package panel
 import (
 	"database/sql"
 	"fmt"
-	"github.com/gorilla/mux"
-	"github.com/sourcegraph/appmon"
 	"html/template"
 	"math"
 	"net/http"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
+
+	"github.com/gorilla/mux"
+	"github.com/sourcegraph/appmon"
 )
 
 const (
@@ -179,8 +181,8 @@ var uiCallsHTML = `
       <a href="calls?sort={{$Sort}}&failedOnly={{$FailedOnly}}&lastNHours={{$LastNHours}}&route={{.Route}}&app={{.App}}" class="list-group-item {{if and (eq $SelectedRoute .Route) (eq $SelectedApp .App)}}active{{end}}">
         <strong>{{if .App}}{{.App}}{{else}}(no app){{end}}</strong>
         {{if .Route}}{{.Route}}{{else}}(unnamed){{end}}
-        <span class="badge">{{.Count}}</span>
-        <span class="badge"><span class="glyphicon glyphicon-time" style="font-size:0.85em"></span> {{duration .AvgDuration}}</span>
+        <span class="badge">{{.Count|num}}</span>
+        <span class="badge {{durationBadgeClass .AvgDuration}}"><span class="glyphicon glyphicon-time" style="font-size:0.85em"></span> {{duration .AvgDuration}}</span>
       </a>
     {{else}}
       <li><div class="alert alert-error">No routes to show.</div></li>
@@ -244,6 +246,19 @@ func tmpl(name, bodySource string) func(http.ResponseWriter, interface{}) {
     <meta charset="utf-8">
     <link rel="shortcut icon" href="data:image/x-icon;," type="image/x-icon"> 
     <link href="//netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+    .d0 { background-color: #bbb; }
+    .d1 { background-color: #ccb7b7; }
+    .d2 { background-color: #cca7a7; }
+    .d3 { background-color: #cc9999; }
+    .d4 { background-color: #cc8282; }
+    .d5 { background-color: #cc7676; }
+    .d6 { background-color: #cc4f4f; }
+    .d7 { background-color: #cc3939; }
+    .d8 { background-color: #cc2a2a; }
+    .d9 { background-color: #cc1c1c; }
+    .d10 { background-color: #cc0e0e; }
+    </style>
   </head>
   <body>
     <div class="navbar navbar-default">
@@ -272,12 +287,14 @@ func tmpl(name, bodySource string) func(http.ResponseWriter, interface{}) {
 			return int64(math.Pow(10, float64(pow)) * float64(int64((float64(n) / math.Pow(10, float64(pow))))))
 		}
 		t := template.New(name).Funcs(template.FuncMap{
-			"eq":           reflect.DeepEqual,
-			"isHTTPError":  func(code int) bool { return code < 200 || code >= 400 },
-			"duration":     func(usec int64) time.Duration { return time.Duration(time.Microsecond * time.Duration(usec)) },
-			"timeAgo":      func(t time.Time) string { return time.Duration(roundPow(int64(time.Since(t)), 9)).String() },
-			"roundMillion": func(n int64) int64 { return roundPow(n, 6) },
-			"bytes":        func(bytes int) string { return fmt.Sprintf("%.1f kb", float64(bytes)/1000.0) },
+			"eq":                 reflect.DeepEqual,
+			"isHTTPError":        func(code int) bool { return code < 200 || code >= 400 },
+			"duration":           func(usec int64) time.Duration { return time.Duration(time.Microsecond * time.Duration(usec)) },
+			"timeAgo":            func(t time.Time) string { return time.Duration(roundPow(int64(time.Since(t)), 9)).String() },
+			"roundMillion":       func(n int64) int64 { return roundPow(n, 6) },
+			"bytes":              func(bytes int) string { return fmt.Sprintf("%.1f kb", float64(bytes)/1000.0) },
+			"num":                num,
+			"durationBadgeClass": durationBadgeClass,
 		})
 
 		t, err := t.Parse(src)
@@ -292,4 +309,43 @@ func tmpl(name, bodySource string) func(http.ResponseWriter, interface{}) {
 			return
 		}
 	}
+}
+
+// num abbreviates and rounds n. Examples: 150, 13.2K, 1.5K.
+func num(n int) string {
+	if n < 1000 {
+		return strconv.Itoa(n)
+	} else if n < 30000 {
+		s := fmt.Sprintf("%.1fk", float64(n)/1000)
+		return strings.Replace(s, ".0k", "k", 1)
+	} else if n < 500000 {
+		return strconv.Itoa(n/1000) + "k"
+	}
+	return fmt.Sprintf("%.1fM", float64(n)/1000000.0)
+}
+
+func durationBadgeClass(usec int64) string {
+	msec := usec / 1000
+	if msec < 30 {
+		return "d0"
+	} else if msec < 60 {
+		return "d1"
+	} else if msec < 90 {
+		return "d2"
+	} else if msec < 150 {
+		return "d3"
+	} else if msec < 250 {
+		return "d4"
+	} else if msec < 400 {
+		return "d5"
+	} else if msec < 600 {
+		return "d6"
+	} else if msec < 900 {
+		return "d7"
+	} else if msec < 1300 {
+		return "d8"
+	} else if msec < 1900 {
+		return "d9"
+	}
+	return "d10"
 }
