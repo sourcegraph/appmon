@@ -1,8 +1,9 @@
 package appmon
 
 import (
-	"github.com/sourcegraph/go-nnz/nnz"
 	"time"
+
+	"github.com/sourcegraph/go-nnz/nnz"
 )
 
 // Call represents an API call made by a client.
@@ -57,6 +58,9 @@ type CallStatus struct {
 	// End is when the request was finished processing.
 	End NullTime
 
+	// BodyPrefix is the portion of the request body that has been read (up to BodyPrefixLimit)
+	BodyPrefix nnz.String
+
 	// BodyLength is the length, in bytes, of the HTTP response body.
 	BodyLength int
 
@@ -69,3 +73,5 @@ type CallStatus struct {
 
 // Params is a map of parameters for states and calls.
 type Params map[string]interface{}
+
+const BodyPrefixLimit = 1000

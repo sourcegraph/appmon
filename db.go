@@ -7,8 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	_ "github.com/lib/pq"
 	"time"
+
+	_ "github.com/lib/pq"
 )
 
 // DBH is a database handle that is agnostic to whether it is a database
@@ -65,6 +66,7 @@ CREATE TABLE "` + DBSchema + `".call (
 
   -- call status fields (filled in post-request)
   "end" timestamp(3),
+  body_prefix varchar(1000),
   body_length int,
   http_status_code int,
   err text,
@@ -84,9 +86,9 @@ func DropDBSchema() (err error) {
 // insertCall adds a Call to the database and writes its serial ID to c.ID.
 func insertCall(c *Call) (err error) {
 	return DB.QueryRow(`
-INSERT INTO "`+DBSchema+`".call(parent_call_id, app, host, remote_addr, user_agent, uid, url, http_method, route, route_params, query_params, "start", "end", body_length, http_status_code, err)
-VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING id
-`, c.ParentCallID, c.App, c.Host, c.RemoteAddr, c.UserAgent, c.UID, c.URL, c.HTTPMethod, c.Route, c.RouteParams, c.QueryParams, c.Start, c.End, c.BodyLength, c.HTTPStatusCode, c.Err).Scan(&c.ID)
+INSERT INTO "`+DBSchema+`".call(parent_call_id, app, host, remote_addr, user_agent, uid, url, http_method, route, route_params, query_params, "start", "end", body_prefix, body_length, http_status_code, err)
+VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) RETURNING id
+`, c.ParentCallID, c.App, c.Host, c.RemoteAddr, c.UserAgent, c.UID, c.URL, c.HTTPMethod, c.Route, c.RouteParams, c.QueryParams, c.Start, c.End, c.BodyPrefix, c.BodyLength, c.HTTPStatusCode, c.Err).Scan(&c.ID)
 }
 
 // QueryCalls returns all calls matching the SQL query conditions.
@@ -100,7 +102,7 @@ func QueryCalls(query string, args ...interface{}) (calls []*Call, err error) {
 		c := new(Call)
 		err = rows.Scan(
 			&c.ID, &c.ParentCallID, &c.App, &c.Host, &c.RemoteAddr, &c.UserAgent, &c.UID, &c.URL, &c.HTTPMethod,
-			&c.Route, &c.RouteParams, &c.QueryParams, &c.Start, &c.End, &c.BodyLength, &c.HTTPStatusCode, &c.Err,
+			&c.Route, &c.RouteParams, &c.QueryParams, &c.Start, &c.End, &c.BodyPrefix, &c.BodyLength, &c.HTTPStatusCode, &c.Err,
 		)
 		if err != nil {
 			return
@@ -112,9 +114,9 @@ func QueryCalls(query string, args ...interface{}) (calls []*Call, err error) {
 
 func setCallStatus(callID int64, s *CallStatus) (err error) {
 	_, err = DB.Exec(`
-UPDATE "`+DBSchema+`".call SET "end" = $1, body_length = $2, http_status_code = $3, err = $4
-WHERE id = $5
-`, s.End, s.BodyLength, s.HTTPStatusCode, s.Err, callID)
+UPDATE "`+DBSchema+`".call SET "end" = $1, body_prefix = $2, body_length = $3, http_status_code = $4, err = $5
+WHERE id = $6
+`, s.End, s.BodyPrefix, s.BodyLength, s.HTTPStatusCode, s.Err, callID)
 	return
 }
 

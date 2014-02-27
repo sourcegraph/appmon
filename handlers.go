@@ -1,11 +1,12 @@
 package appmon
 
 import (
-	"github.com/gorilla/mux"
-	"github.com/sourcegraph/go-nnz/nnz"
 	"log"
 	"net/http"
 	"time"
+
+	"github.com/gorilla/mux"
+	"github.com/sourcegraph/go-nnz/nnz"
 )
 
 // CurrentUser, if set, is called to determine the currently authenticated user
@@ -40,7 +41,7 @@ func BeforeAPICall(app string, r *http.Request) {
 	setCallID(r, c.ID)
 }
 
-func AfterAPICall(r *http.Request, bodyLength, code int, errStr string) {
+func AfterAPICall(r *http.Request, bodyReadRecorder *readCloserRecorder, bodyLength, code int, errStr string) {
 	callID, ok := GetCallID(r)
 	if !ok {
 		log.Printf("AfterAPICall: no CallID")
@@ -49,6 +50,7 @@ func AfterAPICall(r *http.Request, bodyLength, code int, errStr string) {
 
 	err := setCallStatus(callID, &CallStatus{
 		End:            now(),
+		BodyPrefix:     nnz.String(string(bodyReadRecorder.Recorded)),
 		BodyLength:     bodyLength,
 		HTTPStatusCode: code,
 		Err:            nnz.String(errStr),
@@ -64,12 +66,15 @@ type Handler struct {
 }
 
 func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	bodyReadRecorder := newReadCloserRecorder(r.Body, BodyPrefixLimit)
+	r.Body = bodyReadRecorder
+
 	BeforeAPICall(h.App, r)
 
 	rw := newRecorder(w)
 	h.Handler.ServeHTTP(rw, r)
 
-	AfterAPICall(r, rw.BodyLength, rw.Code, "")
+	AfterAPICall(r, bodyReadRecorder, rw.BodyLength, rw.Code, "")
 }
 
 // TrackAPICall wraps an API endpoint handler and records incoming API calls.

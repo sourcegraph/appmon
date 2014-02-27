@@ -72,6 +72,7 @@ func makeCall() *Call {
 		Start:        dbNow(),
 		CallStatus: CallStatus{
 			End:            now(),
+			BodyPrefix:     `{ "foo": "bar" }`,
 			BodyLength:     123,
 			HTTPStatusCode: 200,
 			Err:            "my error",
@@ -110,7 +111,7 @@ func TestSetCallStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s := &CallStatus{End: now(), BodyLength: 456, HTTPStatusCode: 200, Err: "my error"}
+	s := &CallStatus{End: now(), BodyPrefix: `{"foo":"bar"}`, BodyLength: 456, HTTPStatusCode: 200, Err: "my error"}
 	err = setCallStatus(c.ID, s)
 	if err != nil {
 		t.Fatal("insertCallStatus", err)

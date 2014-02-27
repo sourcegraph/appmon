@@ -2,6 +2,7 @@ package appmon
 
 import (
 	"bufio"
+	"io"
 	"net"
 	"net/http"
 )
@@ -42,4 +43,41 @@ func (rw *responseRecorder) WriteHeader(code int) {
 
 func (rw *responseRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	return rw.underlying.(http.Hijacker).Hijack()
+}
+
+// readCloserRecorder is an implementation of io.ReadCloser that records the
+// bytes read from an underlying ReadCloser until a maximum of maxToRecord is
+// reached
+type readCloserRecorder struct {
+	Recorded []byte
+
+	maxToRecord int
+	underlying  io.ReadCloser
+}
+
+// newReadCloserRecorder returns an initialized readCloserRecorder
+func newReadCloserRecorder(underlying io.ReadCloser, maxToRecord int) *readCloserRecorder {
+	return &readCloserRecorder{underlying: underlying, maxToRecord: maxToRecord}
+}
+
+// Reads from underlying ReadCloser and records bytes read
+func (r *readCloserRecorder) Read(p []byte) (n int, err error) {
+	n, err = r.underlying.Read(p)
+
+	nRemaining := r.maxToRecord - len(r.Recorded)
+	var nToRecord int
+	if n > nRemaining {
+		nToRecord = nRemaining
+	} else {
+		nToRecord = n
+	}
+
+	r.Recorded = append(r.Recorded, p[0:nToRecord]...)
+
+	return
+}
+
+// Closes the underlying ReadCloser
+func (r *readCloserRecorder) Close() error {
+	return r.underlying.Close()
 }
