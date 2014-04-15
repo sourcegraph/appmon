@@ -2,7 +2,7 @@ package panel
 
 import (
 	"encoding/json"
-	"github.com/gorilla/mux"
+	"github.com/sqs/mux"
 	"github.com/sourcegraph/appmon"
 	"log"
 	"net/http"

@@ -1,11 +1,12 @@
 package appmon
 
 import (
-	"github.com/gorilla/mux"
-	"github.com/sourcegraph/go-nnz/nnz"
 	"log"
 	"net/http"
 	"time"
+
+	"github.com/sourcegraph/go-nnz/nnz"
+	"github.com/sqs/mux"
 )
 
 // CurrentUser, if set, is called to determine the currently authenticated user

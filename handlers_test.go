@@ -3,8 +3,8 @@ package appmon
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/gorilla/mux"
 	"github.com/sourcegraph/go-nnz/nnz"
+	"github.com/sqs/mux"
 	"net/http"
 	"reflect"
 	"testing"

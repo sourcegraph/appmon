@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"flag"
-	"github.com/gorilla/mux"
+	"github.com/sqs/mux"
 	"github.com/sourcegraph/appmon"
 	"github.com/sourcegraph/appmon/panel"
 	"go/build"

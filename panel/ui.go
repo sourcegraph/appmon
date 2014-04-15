@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gorilla/mux"
+	"github.com/sqs/mux"
 	"github.com/sourcegraph/appmon"
 )
 
