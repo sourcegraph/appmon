@@ -36,7 +36,7 @@ func UIRouter(theBaseHref string, rt *mux.Router) *mux.Router {
 
 func uiCall(w http.ResponseWriter, r *http.Request) {
 	v := mux.Vars(r)
-	callID, _ := strconv.Atoi(v["CallID"])
+	callID, _ := strconv.ParseInt(v["CallID"], 10, 64)
 
 	calls, err := appmon.QueryCalls(`WHERE id=$1 OR parent_call_id=$1 ORDER BY start ASC`, callID)
 	if err != nil {
@@ -46,7 +46,7 @@ func uiCall(w http.ResponseWriter, r *http.Request) {
 
 	tmpl(appmonUICall, uiCallHTML)(w, struct {
 		common
-		CallID int
+		CallID int64
 		Calls  []*appmon.Call
 	}{
 		common: newCommon("Call"),
@@ -57,25 +57,27 @@ func uiCall(w http.ResponseWriter, r *http.Request) {
 
 var uiCallHTML = `
 <h1>Parent call {{.CallID}}</h1>
-<div class="row">
+<style>
+.parent-call { border-bottom: solid 5px #999; }
+</style>
+<div class="row-fluid">
   <div class="col-md-12">
     <table class="table">
-      <thead><tr><th>ID</th><th>Start</th><th>URL</th><th>Duration</th><th>Bytes</th><th>Status</th></thead>
+      <thead><tr><th>ID</th><th>Route</th><th>Duration</th><th>URL</th><th>Bytes</th><th>Status</th></thead>
       <tbody>
+        {{$CallID:=.CallID}}
         {{range .Calls}}
-          <tr class="{{if isHTTPError .HTTPStatusCode}}danger{{end}}">
-            <td>{{.ID}} {{if .ParentCallID}}<br><span class="text-muted" title="ParentCallID">{{.ParentCallID}}</span>{{end}}</td>
-            <td>
-              {{.Start.Format "2006-01-02 15:04:05"}}<br>
-              <span class="text-muted">{{timeAgo .Start}}</span>
-            </td>
-            <td style="word-wrap:break-word;max-width:200px;"><span class="text-muted">{{.Route}}</span><br><tt style="font-size:0.85em"><a href="{{.URL}}" target="_blank">{{.URL}}</a></tt></td>
+          {{$isParent:=(eq .ID $CallID)}}
+          <tr class="{{if isHTTPError .HTTPStatusCode}}danger{{end}} {{if $isParent}}parent-call{{end}}">
+            <td>{{.ID}} {{if $isParent}}<br><strong class="text-muted">Parent</strong>{{end}}</td>
+            <td style="max-width:150px"><strong>{{.Route}}</strong></td>
             <td>{{.Duration}}</td>
+            <td style="word-wrap:break-word;max-width:200px;"><tt style="font-size:0.85em"><a href="{{.URL}}" target="_blank">{{.URL}}</a></tt></td>
             <td>{{bytes .BodyLength}}</td>
             <td title="{{.Err}}">{{.HTTPStatusCode}}</td>
           </tr>
         {{else}}
-          <tr><td colspan="5" class="alert alert-warning">No calls found for route {{.CallID}}.</td></tr>
+          <tr><td colspan="5" class="alert alert-warning">No calls found for call ID {{.CallID}}.</td></tr>
         {{end}}
       </tbody>
     </table>
@@ -194,7 +196,7 @@ func getCallRoutes(lastNHours int, failedOnly bool) (callRoutes []*callRoute, er
 
 var uiCallsHTML = `
 <h1>Calls</h1>
-<div class="row">
+<div class="row-fluid">
   <div class="col-md-2">
     <form action="calls" method="get" class="form">
       {{if .SelectedRoute}}<input type="hidden" name="route" value="{{.SelectedRoute}}">{{end}}
