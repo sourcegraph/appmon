@@ -17,6 +17,7 @@ import (
 
 const (
 	appmonUIRoutes = "appmon:ui:routes"
+	appmonUICall   = "appmon:ui:call"
 	appmonUICalls  = "appmon:ui:calls"
 	appmonUIMain   = "appmon:ui:main"
 )
@@ -26,11 +27,61 @@ var baseHref string
 // Router adds panel routes to an existing mux.Router.
 func UIRouter(theBaseHref string, rt *mux.Router) *mux.Router {
 	baseHref = theBaseHref
+	rt.Path(`/calls/{CallID:\d+}`).Methods("GET").HandlerFunc(uiCall).Name(appmonUICall)
 	rt.Path("/calls").Methods("GET").HandlerFunc(uiCalls).Name(appmonUICalls)
 	rt.Path("/").Methods("GET").HandlerFunc(uiMain).Name(appmonUIMain)
 
 	return rt
 }
+
+func uiCall(w http.ResponseWriter, r *http.Request) {
+	v := mux.Vars(r)
+	callID, _ := strconv.Atoi(v["CallID"])
+
+	calls, err := appmon.QueryCalls(`WHERE id=$1 OR parent_call_id=$1 ORDER BY start ASC`, callID)
+	if err != nil {
+		http.Error(w, "QueryCalls failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	tmpl(appmonUICall, uiCallHTML)(w, struct {
+		common
+		CallID int
+		Calls  []*appmon.Call
+	}{
+		common: newCommon("Call"),
+		CallID: callID,
+		Calls:  calls,
+	})
+}
+
+var uiCallHTML = `
+<h1>Parent call {{.CallID}}</h1>
+<div class="row">
+  <div class="col-md-12">
+    <table class="table">
+      <thead><tr><th>ID</th><th>Start</th><th>URL</th><th>Duration</th><th>Bytes</th><th>Status</th></thead>
+      <tbody>
+        {{range .Calls}}
+          <tr class="{{if isHTTPError .HTTPStatusCode}}danger{{end}}">
+            <td>{{.ID}} {{if .ParentCallID}}<br><span class="text-muted" title="ParentCallID">{{.ParentCallID}}</span>{{end}}</td>
+            <td>
+              {{.Start.Format "2006-01-02 15:04:05"}}<br>
+              <span class="text-muted">{{timeAgo .Start}}</span>
+            </td>
+            <td style="word-wrap:break-word;max-width:200px;"><span class="text-muted">{{.Route}}</span><br><tt style="font-size:0.85em"><a href="{{.URL}}" target="_blank">{{.URL}}</a></tt></td>
+            <td>{{.Duration}}</td>
+            <td>{{bytes .BodyLength}}</td>
+            <td title="{{.Err}}">{{.HTTPStatusCode}}</td>
+          </tr>
+        {{else}}
+          <tr><td colspan="5" class="alert alert-warning">No calls found for route {{.CallID}}.</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+`
 
 func uiCalls(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
