@@ -69,7 +69,7 @@ var uiCallHTML = `
         {{range .Calls}}
           {{$isParent:=(eq .ID $CallID)}}
           <tr class="{{if isHTTPError .HTTPStatusCode}}danger{{end}} {{if $isParent}}parent-call{{end}}">
-            <td>{{.ID}} {{if $isParent}}<br><strong class="text-muted">Parent</strong>{{end}}</td>
+            <td><a href="calls/{{.ID}}">{{.ID}}</a> {{if $isParent}}<br><strong class="text-muted">Parent</strong>{{end}}</td>
             <td style="max-width:150px"><strong>{{.Route}}</strong></td>
             <td>{{.Duration}}</td>
             <td style="word-wrap:break-word;max-width:200px;"><tt style="font-size:0.85em"><a href="{{.URL}}" target="_blank">{{.URL}}</a></tt></td>
