@@ -44,19 +44,34 @@ func uiCall(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var call *appmon.Call
+	for _, c := range calls {
+		if c.ID == callID {
+			call = c
+		}
+	}
+
+	if call == nil {
+		http.Error(w, "call not found", http.StatusNotFound)
+		return
+	}
+
 	tmpl(appmonUICall, uiCallHTML)(w, struct {
 		common
-		CallID int64
-		Calls  []*appmon.Call
+		Call  *appmon.Call
+		Calls []*appmon.Call
 	}{
 		common: newCommon("Call"),
-		CallID: callID,
+		Call:   call,
 		Calls:  calls,
 	})
 }
 
 var uiCallHTML = `
-<h1>Parent call {{.CallID}}</h1>
+<h1>Parent call {{.Call.ID}}</h1>
+{{if .Call.ParentCallID}}
+<p><a href="calls/{{.Call.ParentCallID}}">View parent call</a></p>
+{{end}}
 <style>
 .parent-call { border-bottom: solid 5px #999; }
 </style>
@@ -65,7 +80,7 @@ var uiCallHTML = `
     <table class="table">
       <thead><tr><th>ID</th><th>Route</th><th>Duration</th><th>URL</th><th>Bytes</th><th>Status</th></thead>
       <tbody>
-        {{$CallID:=.CallID}}
+        {{$CallID:=.Call.ID}}
         {{range .Calls}}
           {{$isParent:=(eq .ID $CallID)}}
           <tr class="{{if isHTTPError .HTTPStatusCode}}danger{{end}} {{if $isParent}}parent-call{{end}}">
