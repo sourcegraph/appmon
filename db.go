@@ -81,8 +81,8 @@ func DropDBSchema() (err error) {
 	return
 }
 
-// insertCall adds a Call to the database and writes its serial ID to c.ID.
-func insertCall(c *Call) (err error) {
+// InsertCall adds a Call to the database and writes its serial ID to c.ID.
+func InsertCall(c *Call) (err error) {
 	return DB.QueryRow(`
 INSERT INTO "`+DBSchema+`".call(parent_call_id, app, host, remote_addr, user_agent, uid, url, http_method, route, route_params, query_params, "start", "end", body_length, http_status_code, err)
 VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING id

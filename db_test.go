@@ -84,9 +84,9 @@ func TestInsertCall(t *testing.T) {
 	defer dbTearDown()
 
 	c := makeCall()
-	err := insertCall(c)
+	err := InsertCall(c)
 	if err != nil {
-		t.Fatal("insertCall", err)
+		t.Fatal("InsertCall", err)
 	}
 	if c.ID == 0 {
 		t.Error("c.ID == 0")
@@ -105,7 +105,7 @@ func TestSetCallStatus(t *testing.T) {
 	defer dbTearDown()
 
 	c := makeCall()
-	err := insertCall(c)
+	err := InsertCall(c)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,7 +113,7 @@ func TestSetCallStatus(t *testing.T) {
 	s := &CallStatus{End: now(), BodyLength: 456, HTTPStatusCode: 200, Err: "my error"}
 	err = setCallStatus(c.ID, s)
 	if err != nil {
-		t.Fatal("insertCallStatus", err)
+		t.Fatal("InsertCallStatus", err)
 	}
 
 	c.CallStatus = *s

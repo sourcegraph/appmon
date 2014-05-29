@@ -34,9 +34,9 @@ func BeforeAPICall(app string, r *http.Request) {
 		c.UID = nnz.Int(CurrentUser(r))
 	}
 
-	err := insertCall(c)
+	err := InsertCall(c)
 	if err != nil {
-		log.Printf("insertCall failed: %s", err)
+		log.Printf("InsertCall failed: %s", err)
 	}
 	setCallID(r, c.ID)
 }
