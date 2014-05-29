@@ -55,7 +55,7 @@ CREATE TABLE "` + DBSchema + `".call (
   user_agent varchar(500) NOT NULL,
   uid int NULL,
 
-  url varchar(1000) NOT NULL,
+  url varchar(10000) NOT NULL,
   http_method varchar(12) NOT NULL,
   route varchar(64) NULL,
   route_params varchar(1000) NOT NULL,
