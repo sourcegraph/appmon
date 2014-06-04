@@ -7,8 +7,8 @@ import (
 	"strconv"
 )
 
-// ParentCallIDHeader is the HTTP request header ("X-Appmon-Call-ID") that
-// contains the call ID associated with the API call.
+// ParentCallIDHeader is the HTTP request header ("X-Appmon-Parent-Call-ID")
+// that contains the call ID associated with the API call.
 const ParentCallIDHeader = "X-Appmon-Parent-Call-ID"
 
 // GetCallID gets the current call ID (if any) from the request context.
