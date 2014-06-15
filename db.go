@@ -7,8 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	_ "github.com/lib/pq"
 	"time"
+
+	_ "github.com/lib/pq"
 )
 
 // DBH is a database handle that is agnostic to whether it is a database
@@ -44,7 +45,7 @@ func OpenDB() (err error) {
 func InitDBSchema() (err error) {
 	_, err = DB.Exec(`
 CREATE SCHEMA "` + DBSchema + `";
-CREATE TABLE "` + DBSchema + `".call (
+CREATE UNLOGGED TABLE "` + DBSchema + `".call (
   id bigserial NOT NULL,
   parent_call_id bigint,
 
