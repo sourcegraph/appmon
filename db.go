@@ -72,6 +72,7 @@ CREATE UNLOGGED TABLE "` + DBSchema + `".call (
 
   CONSTRAINT call_pkey PRIMARY KEY (id)
 );
+CREATE INDEX call_parent_call_id ON appmon.call(parent_call_id);
 `)
 	return
 }
