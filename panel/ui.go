@@ -87,7 +87,7 @@ var uiCallHTML = `
             <td><a href="calls/{{.ID}}">{{.ID}}</a> {{if $isParent}}<br><strong class="text-muted">Parent</strong>{{end}}</td>
             <td style="max-width:150px"><strong>{{.Route}}</strong></td>
             <td>{{.Duration}}</td>
-            <td style="word-wrap:break-word;max-width:200px;"><tt style="font-size:0.85em;white-space:pre-line"><a href="{{.URL}}" target="_blank"><pre>{{.URL}}</pre></a></tt></td>
+            <td style="word-wrap:break-word;max-width:200px;"><tt style="font-size:0.85em;white-space:pre-line"><pre><a href="{{.URL}}" target="_blank">{{.URL}}</a></pre></tt></td>
             <td>{{bytes .BodyLength}}</td>
             <td title="{{.Err}}">{{.HTTPStatusCode}}</td>
           </tr>
