@@ -56,7 +56,7 @@ CREATE UNLOGGED TABLE "` + DBSchema + `".call (
   user_agent varchar(500) NOT NULL,
   uid int NULL,
 
-  url varchar(10000) NOT NULL,
+  url varchar(1000) NOT NULL,
   http_method varchar(12) NOT NULL,
   route varchar(64) NULL,
   route_params varchar(1000) NOT NULL,
@@ -87,7 +87,7 @@ func DropDBSchema() (err error) {
 func InsertCall(c *Call) (err error) {
 	return DB.QueryRow(`
 INSERT INTO "`+DBSchema+`".call(parent_call_id, app, host, remote_addr, user_agent, uid, url, http_method, route, route_params, query_params, "start", "end", body_length, http_status_code, err)
-VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING id
+VALUES($1, $2, $3, left($4, 24), left($5, 500), $6, left($7, 10000), left($8, 12), left($9, 64), left($10, 1000), left($11, 1000), $12, $13, $14, $15, left($16, 1000)) RETURNING id
 `, c.ParentCallID, c.App, c.Host, c.RemoteAddr, c.UserAgent, c.UID, c.URL, c.HTTPMethod, c.Route, c.RouteParams, c.QueryParams, c.Start, c.End, c.BodyLength, c.HTTPStatusCode, c.Err).Scan(&c.ID)
 }
 
