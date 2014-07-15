@@ -12,6 +12,9 @@ import (
 	_ "github.com/lib/pq"
 )
 
+// Appended to by subsidiary packages to initialize additional schema
+var InitSQL []string
+
 // DBH is a database handle that is agnostic to whether it is a database
 // connection or transaction.
 type DBH interface {
@@ -74,6 +77,16 @@ CREATE UNLOGGED TABLE "` + DBSchema + `".call (
 );
 CREATE INDEX call_parent_call_id ON appmon.call(parent_call_id);
 `)
+	if err != nil {
+		return
+	}
+
+	for _, sql := range InitSQL {
+		_, err = DB.Exec(sql)
+		if err != nil {
+			return
+		}
+	}
 	return
 }
 

@@ -20,6 +20,7 @@ const (
 	appmonUICall   = "appmon:ui:call"
 	appmonUICalls  = "appmon:ui:calls"
 	appmonUIMain   = "appmon:ui:main"
+	appmonUIStats  = "appmon:ui:stats"
 )
 
 var baseHref string
@@ -29,6 +30,7 @@ func UIRouter(theBaseHref string, rt *mux.Router) *mux.Router {
 	baseHref = theBaseHref
 	rt.Path(`/calls/{CallID:\d+}`).Methods("GET").HandlerFunc(uiCall).Name(appmonUICall)
 	rt.Path("/calls").Methods("GET").HandlerFunc(uiCalls).Name(appmonUICalls)
+	rt.Path("/stats").Methods("GET").HandlerFunc(uiStats).Name(appmonUIStats)
 	rt.Path("/").Methods("GET").HandlerFunc(uiMain).Name(appmonUIMain)
 
 	return rt
@@ -341,6 +343,9 @@ func tmpl(name, bodySource string) func(http.ResponseWriter, interface{}) {
       <div class="navbar-collapse collapse">
         <ul class="nav navbar-nav">
           <li><a href="calls">Calls</a></li>
+        </ul>
+        <ul class="nav navbar-nav">
+          <li><a href="stats">Stats</a></li>
         </ul>
       </div><!--/.nav-collapse -->
     </div>

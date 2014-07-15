@@ -3,9 +3,6 @@ package main
 import (
 	"encoding/json"
 	"flag"
-	"github.com/sqs/mux"
-	"github.com/sourcegraph/appmon"
-	"github.com/sourcegraph/appmon/panel"
 	"go/build"
 	"html/template"
 	"log"
@@ -16,6 +13,10 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/sourcegraph/appmon"
+	"github.com/sourcegraph/appmon/panel"
+	"github.com/sqs/mux"
 )
 
 var bind = flag.String("http", ":8888", "HTTP bind address")
