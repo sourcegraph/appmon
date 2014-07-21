@@ -3,9 +3,6 @@ package main
 import (
 	"encoding/json"
 	"flag"
-	"github.com/sqs/mux"
-	"github.com/sourcegraph/appmon"
-	"github.com/sourcegraph/appmon/panel"
 	"go/build"
 	"html/template"
 	"log"
@@ -16,6 +13,10 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/sourcegraph/appmon"
+	"github.com/sourcegraph/appmon/panel"
+	"github.com/sqs/mux"
 )
 
 var bind = flag.String("http", ":8888", "HTTP bind address")
@@ -72,7 +73,7 @@ func main() {
 	http.Handle("/", rt)
 
 	if *authUID != 0 {
-		appmon.CurrentUser = func(r *http.Request) int {
+		appmon.CurrentUser = func(r *http.Request, w http.ResponseWriter) int {
 			return *authUID
 		}
 	}
