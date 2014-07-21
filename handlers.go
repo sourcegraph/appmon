@@ -13,7 +13,7 @@ import (
 // for the current request. The returned user ID is stored in the Call record if
 // nonzero. It is also passed to the ResponseWriter, in case the user ID is
 // generated on-the-fly and must be passed back to the client.
-var CurrentUser func(r *http.Request, w http.ResponseWriter) int
+var CurrentUser func(r *http.Request, w http.ResponseWriter) int64
 
 func BeforeAPICall(app string, w http.ResponseWriter, r *http.Request) {
 	c := &Call{
@@ -32,7 +32,7 @@ func BeforeAPICall(app string, w http.ResponseWriter, r *http.Request) {
 		c.ParentCallID = nnz.Int64(parentCallID)
 	}
 	if CurrentUser != nil {
-		c.UID = nnz.Int(CurrentUser(r, w))
+		c.UID = nnz.Int64(CurrentUser(r, w))
 	}
 
 	err := InsertCall(c)

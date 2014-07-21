@@ -1,8 +1,9 @@
 package appmon
 
 import (
-	"github.com/sourcegraph/go-nnz/nnz"
 	"time"
+
+	"github.com/sourcegraph/go-nnz/nnz"
 )
 
 // Call represents an API call made by a client.
@@ -26,7 +27,7 @@ type Call struct {
 	UserAgent string
 
 	// UID is the user ID of the authenticated user, if any.
-	UID nnz.Int
+	UID nnz.Int64
 
 	// URL is the full URL of the request.
 	URL string
