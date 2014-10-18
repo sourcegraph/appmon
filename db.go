@@ -49,18 +49,18 @@ CREATE UNLOGGED TABLE "` + DBSchema + `".call (
   id bigserial NOT NULL,
   parent_call_id bigint,
 
-  app varchar(24) NOT NULL,
-  host varchar(32) NOT NULL,
+  app text NOT NULL,
+  host text NOT NULL,
 
-  remote_addr varchar(24) NOT NULL,
-  user_agent varchar(500) NOT NULL,
+  remote_addr text NOT NULL,
+  user_agent text NOT NULL,
   uid bigint NULL,
 
-  url varchar(1000) NOT NULL,
-  http_method varchar(12) NOT NULL,
-  route varchar(64) NULL,
-  route_params varchar(1000) NOT NULL,
-  query_params varchar(1000) NOT NULL,
+  url text NOT NULL,
+  http_method text NOT NULL,
+  route text NULL,
+  route_params text NOT NULL,
+  query_params text NOT NULL,
 
   start timestamp(3) NOT NULL,
 
