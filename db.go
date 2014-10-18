@@ -54,7 +54,7 @@ CREATE UNLOGGED TABLE "` + DBSchema + `".call (
 
   remote_addr text NOT NULL,
   user_agent text NOT NULL,
-  uid bigint NULL,
+  uid int NULL,
 
   url text NOT NULL,
   http_method text NOT NULL,

@@ -12,7 +12,7 @@ import (
 // CurrentUser, if set, is called to determine the currently authenticated user
 // for the current request. The returned user ID is stored in the Call record if
 // nonzero.
-var CurrentUser func(r *http.Request) int64
+var CurrentUser func(r *http.Request) int
 
 func BeforeAPICall(app string, r *http.Request) {
 	c := &Call{
@@ -31,7 +31,7 @@ func BeforeAPICall(app string, r *http.Request) {
 		c.ParentCallID = nnz.Int64(parentCallID)
 	}
 	if CurrentUser != nil {
-		c.UID = nnz.Int64(CurrentUser(r))
+		c.UID = nnz.Int(CurrentUser(r))
 	}
 
 	err := InsertCall(c)
