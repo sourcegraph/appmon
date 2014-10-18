@@ -73,7 +73,7 @@ func main() {
 	http.Handle("/", rt)
 
 	if *authUID != 0 {
-		appmon.CurrentUser = func(r *http.Request, w http.ResponseWriter) int64 {
+		appmon.CurrentUser = func(r *http.Request) int64 {
 			return int64(*authUID)
 		}
 	}

@@ -11,11 +11,10 @@ import (
 
 // CurrentUser, if set, is called to determine the currently authenticated user
 // for the current request. The returned user ID is stored in the Call record if
-// nonzero. It is also passed to the ResponseWriter, in case the user ID is
-// generated on-the-fly and must be passed back to the client.
-var CurrentUser func(r *http.Request, w http.ResponseWriter) int64
+// nonzero.
+var CurrentUser func(r *http.Request) int64
 
-func BeforeAPICall(app string, w http.ResponseWriter, r *http.Request) {
+func BeforeAPICall(app string, r *http.Request) {
 	c := &Call{
 		App:         app,
 		Host:        hostname,
@@ -32,7 +31,7 @@ func BeforeAPICall(app string, w http.ResponseWriter, r *http.Request) {
 		c.ParentCallID = nnz.Int64(parentCallID)
 	}
 	if CurrentUser != nil {
-		c.UID = nnz.Int64(CurrentUser(r, w))
+		c.UID = nnz.Int64(CurrentUser(r))
 	}
 
 	err := InsertCall(c)
@@ -66,7 +65,7 @@ type Handler struct {
 }
 
 func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	BeforeAPICall(h.App, w, r)
+	BeforeAPICall(h.App, r)
 
 	rw := newRecorder(w)
 	h.Handler.ServeHTTP(rw, r)
