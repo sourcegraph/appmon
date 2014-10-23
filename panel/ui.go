@@ -38,7 +38,7 @@ func uiCall(w http.ResponseWriter, r *http.Request) {
 	v := mux.Vars(r)
 	callID, _ := strconv.ParseInt(v["CallID"], 10, 64)
 
-	calls, err := appmon.QueryCalls(`WHERE id=$1 OR parent_call_id=$1 ORDER BY start ASC`, callID)
+	calls, err := appmon.QueryCalls(`WHERE id=$1 OR parent_call_id=$1 ORDER BY id ASC`, callID)
 	if err != nil {
 		http.Error(w, "QueryCalls failed: "+err.Error(), http.StatusInternalServerError)
 		return
