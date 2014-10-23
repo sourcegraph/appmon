@@ -62,9 +62,15 @@ func AfterAPICall(r *http.Request, bodyLength, code int, errStr string) {
 type Handler struct {
 	App     string
 	Handler http.Handler
+	Track   func(*http.Request) bool // if non-nil, called to determine whether to track this request
 }
 
 func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if h.Track != nil && h.Track(r) == false {
+		h.Handler.ServeHTTP(w, r)
+		return
+	}
+
 	BeforeAPICall(h.App, r)
 
 	rw := newRecorder(w)
@@ -75,7 +81,7 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // TrackAPICall wraps an API endpoint handler and records incoming API calls.
 func TrackAPICall(app string, h http.Handler) http.Handler {
-	return Handler{app, h}
+	return Handler{app, h, nil}
 }
 
 func mapStringStringAsParams(m map[string]string) (p Params) {
